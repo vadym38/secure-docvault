@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+
+{% block body_class %}client-page{% endblock %}
+{% block title %}Захисні заголовки · Secure DocVault{% endblock %}
+
+{% block content %}
+<main class="client-shell">
+  <header class="lab-head">
+    {% include "_brand.html" %}
+    <nav class="api-head-actions" aria-label="Навігація">
+      <a class="btn btn--ghost" href="{{ url_for('client.lab_index') }}">Клієнтський захист</a>
+      <a class="btn btn--ghost" href="{{ url_for('auth.index') }}">
+        {{ icon('arrow', 'icon--back') }}<span>Назад</span>
+      </a>
+    </nav>
+  </header>
+
+  <section class="client-hero">
+    <p class="eyebrow"><span class="pulse-dot"></span> Response headers / server hardening</p>
+    <h1>Сервер <span class="grad">сам розповідає браузеру правила.</span></h1>
+    <p class="lede">
+      Кожна відповідь Secure DocVault містить CSP без <code>unsafe-inline</code>,
+      HSTS, <code>nosniff</code>, заборону фреймів і сувору політику реферера.
+      Заголовки нижче отримані з реальної відповіді API, а не зі статичної таблиці.
+    </p>
+    {% include "_client_nav.html" %}
+  </section>
+
+  <section class="panel">
+    <div class="panel__head">
+      <h2>Матриця заголовків</h2>
+      <span class="badge badge--ok">status {{ status_code }}</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>Заголовок</th><th>Значення</th><th>Загроза, яку блокує</th></tr>
+        </thead>
+        <tbody>
+          {% for item in header_matrix %}
+            <tr>
+              <td class="mono">{{ item.name }}</td>
+              <td class="mono table-value">{{ item.value }}</td>
+              <td>{{ item.threat }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel__head">
+      <h2>Фактичні заголовки відповіді</h2>
+      <span class="badge">GET /api/v1/health</span>
+    </div>
+    <pre class="code-block code-block--headers">{% for name, value in response_headers %}{{ name }}: {{ value }}
+{% endfor %}</pre>
+    <p class="api-note">
+      Перевірити з термінала: <code>curl -I http://localhost:5000/client-lab</code>.
+      HSTS починає діяти лише після першого HTTPS-візиту; на локальному HTTP
+      заголовок присутній, але браузер його ігнорує.
+    </p>
+  </section>
+
+  <section class="panel">
+    <div class="panel__head">
+      <h2>Політика CSP</h2>
+      <span class="badge badge--ok">script-src 'self'</span>
+    </div>
+    <pre class="code-block code-block--csp">{{ csp_policy }}</pre>
+    <div class="policy-grid">
+      <article>
+        <h3>Заборонено</h3>
+        <p><code>unsafe-inline</code>, <code>unsafe-eval</code>, сторонні CDN, <code>data:</code>-скрипти.</p>
+      </article>
+      <article>
+        <h3>Дозволено</h3>
+        <p>Лише скрипти, стилі, шрифти та зображення з власного Origin (і <code>data:</code> для img).</p>
+      </article>
+      <article>
+        <h3>Додатково</h3>
+        <p><code>object-src 'none'</code>, <code>frame-ancestors 'none'</code>, <code>base-uri 'self'</code>.</p>
+      </article>
+    </div>
+  </section>
+</main>
+{% endblock %}

@@ -70,6 +70,20 @@ CREATE TABLE IF NOT EXISTS access_token_revocations (
 
 CREATE INDEX IF NOT EXISTS idx_access_revocations_user
     ON access_token_revocations (user_id);
+
+-- ЛР №3: безпечні нотатки/описи документів. У поле description потрапляє
+-- вже санітизований текст; сирий HTML не зберігається.
+CREATE TABLE IF NOT EXISTS client_notes (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    author          TEXT    NOT NULL DEFAULT 'guest',
+    filename        TEXT    NOT NULL,
+    description     TEXT    NOT NULL,
+    blocked_vectors TEXT    NOT NULL DEFAULT '',
+    created_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_client_notes_created
+    ON client_notes (created_at DESC);
 """
 
 
@@ -377,6 +391,46 @@ def list_refresh_tokens(limit: int = 20) -> list[sqlite3.Row]:
             FROM refresh_tokens AS rt
             LEFT JOIN users AS u ON u.id = rt.user_id
             ORDER BY rt.id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    )
+
+
+# ---------------------------------------------------------------------------
+# Санітизовані нотатки клієнтської лабораторії (ЛР №3)
+# ---------------------------------------------------------------------------
+
+def create_client_note(
+    author: str,
+    filename: str,
+    description: str,
+    blocked_vectors: str = "",
+) -> int:
+    """Зберігає вже санітизований опис документа."""
+
+    db = get_db()
+    cursor = db.execute(
+        """
+        INSERT INTO client_notes (author, filename, description, blocked_vectors)
+        VALUES (?, ?, ?, ?)
+        """,
+        (author, filename, description, blocked_vectors),
+    )
+    db.commit()
+    return int(cursor.lastrowid)
+
+
+def list_client_notes(limit: int = 8) -> list[sqlite3.Row]:
+    """Повертає останні безпечні нотатки для стенда."""
+
+    return list(
+        get_db().execute(
+            """
+            SELECT id, author, filename, description, blocked_vectors, created_at
+            FROM client_notes
+            ORDER BY id DESC
             LIMIT ?
             """,
             (limit,),

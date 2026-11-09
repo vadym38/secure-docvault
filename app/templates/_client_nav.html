@@ -1,0 +1,13 @@
+{% set endpoint = request.endpoint %}
+<nav class="client-subnav" aria-label="Розділи клієнтської лабораторії">
+  <a class="client-subnav__item {% if endpoint == 'client.lab_index' %}is-active{% endif %}"
+     href="{{ url_for('client.lab_index') }}">Огляд і санітизатор</a>
+  <a class="client-subnav__item {% if endpoint == 'client.csp_lab' %}is-active{% endif %}"
+     href="{{ url_for('client.csp_lab') }}">CSP</a>
+  <a class="client-subnav__item {% if endpoint == 'client.cookies_lab' %}is-active{% endif %}"
+     href="{{ url_for('client.cookies_lab') }}">Cookies</a>
+  <a class="client-subnav__item {% if endpoint == 'client.headers_lab' %}is-active{% endif %}"
+     href="{{ url_for('client.headers_lab') }}">Заголовки</a>
+  <a class="client-subnav__item {% if endpoint == 'client.cors_lab' %}is-active{% endif %}"
+     href="{{ url_for('client.cors_lab') }}">CORS</a>
+</nav>

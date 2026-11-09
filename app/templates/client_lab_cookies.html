@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+
+{% block body_class %}client-page{% endblock %}
+{% block title %}Cookie Inspector · Secure DocVault{% endblock %}
+
+{% block content %}
+<main class="client-shell">
+  <header class="lab-head">
+    {% include "_brand.html" %}
+    <nav class="api-head-actions" aria-label="Навігація">
+      <a class="btn btn--ghost" href="{{ url_for('client.lab_index') }}">Клієнтський захист</a>
+      <a class="btn btn--ghost" href="{{ url_for('auth.index') }}">
+        {{ icon('arrow', 'icon--back') }}<span>Назад</span>
+      </a>
+    </nav>
+  </header>
+
+  <section class="client-hero">
+    <p class="eyebrow"><span class="pulse-dot"></span> Cookie container / HttpOnly + Secure + SameSite</p>
+    <h1>Сесія, яку <span class="grad">не читає JavaScript.</span></h1>
+    <p class="lede">
+      Чутливі ідентифікатори зберігаються в cookie з <code>HttpOnly</code>,
+      <code>Secure</code> та <code>SameSite=Strict</code>. Навіть якщо на
+      сторінці виконається сторонній скрипт, він не отримає сесійний
+      ідентифікатор через <code>document.cookie</code>, а браузер не
+      відправить cookie на сторонній сайт.
+    </p>
+    {% include "_client_nav.html" %}
+  </section>
+
+  <div class="client-grid">
+    <section class="panel">
+      <div class="panel__head">
+        <h2>Cookie Inspector</h2>
+        <span class="badge badge--ok">live browser store</span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table cookie-table">
+          <thead>
+            <tr>
+              <th>Name</th><th>HttpOnly</th><th>Secure</th><th>SameSite</th><th>Призначення</th>
+            </tr>
+          </thead>
+          <tbody id="cookie-table-body">
+            {% for spec in cookie_specs %}
+              <tr>
+                <td class="mono">{{ spec.name }}</td>
+                <td><span class="flag {{ 'flag--ok' if spec.http_only else 'flag--off' }}">{{ 'ON' if spec.http_only else 'OFF' }}</span></td>
+                <td><span class="flag {{ 'flag--ok' if spec.secure else 'flag--warn' }}">{{ 'ON' if spec.secure else 'OFF' }}</span></td>
+                <td><span class="flag flag--ok">{{ spec.same_site }}</span></td>
+                <td>{{ spec.purpose }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="api-note">
+        У демонстраційному режимі сервер працює через HTTPS-сумісний
+        <code>localhost</code>, тому прапорець <code>Secure</code> реально
+        зберігається браузером. Перевірити можна в DevTools → Application → Cookies.
+      </p>
+    </section>
+
+    <section class="panel" id="cookie-js-panel">
+      <div class="panel__head">
+        <h2>Що бачить JavaScript</h2>
+        <span class="badge badge--bad">document.cookie</span>
+      </div>
+      <pre id="cookie-visible" class="code-block code-block--console">перевірка…</pre>
+      <div class="cookie-callout">
+        <span class="icon-tile">{{ icon('lock') }}</span>
+        <div>
+          <h3>HttpOnly недоступний з JS</h3>
+          <p>
+            У виводі вище є лише публічний CSRF-токен. Сесійні cookie
+            <code>docvault_session</code> і <code>docvault_demo_session</code>
+            мають <code>HttpOnly</code>, тому рядок <code>document.cookie</code>
+            їх не містить.
+          </p>
+        </div>
+      </div>
+      <div class="cookie-flags">
+        <div><span>HttpOnly</span><strong>document.cookie → недоступно</strong></div>
+        <div><span>Secure</span><strong>лише HTTPS / trustworthy localhost</strong></div>
+        <div><span>SameSite=Strict</span><strong>без cross-site відправки</strong></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="panel__head">
+      <h2>Чому це зупиняє CSRF</h2>
+      <span class="badge">SameSite semantics</span>
+    </div>
+    <div class="policy-grid">
+      <article>
+        <h3>Strict</h3>
+        <p>Cookie не додається до жодного cross-site запиту, навіть до безпечного GET-переходу з іншого сайту.</p>
+      </article>
+      <article>
+        <h3>HttpOnly</h3>
+        <p>XSS-скрипт не може викрасти сесію через <code>document.cookie</code>; він бачить лише публічні значення.</p>
+      </article>
+      <article>
+        <h3>Secure</h3>
+        <p>Браузер не передає cookie через відкритий HTTP, тому перехоплення трафіку не дає сесійного ідентифікатора.</p>
+      </article>
+    </div>
+  </section>
+</main>
+
+<script src="{{ url_for('static', filename='js/client_lab_cookies.js') }}" defer></script>
+{% endblock %}

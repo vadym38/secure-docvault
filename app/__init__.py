@@ -1,4 +1,4 @@
-"""Application factory для Secure DocVault (етап 2)."""
+"""Application factory для Secure DocVault (етап 3)."""
 
 from __future__ import annotations
 
@@ -6,9 +6,11 @@ from flask import Flask, jsonify, render_template, request
 
 from .api import api_bp
 from .auth import auth_bp
+from .client_security import client_bp
 from .config import Config
 from .database import init_app as init_database
 from .jwt_service import MIN_SECRET_BYTES
+from .security import install_security_middleware
 
 
 def _validate_jwt_config(app: Flask) -> None:
@@ -42,25 +44,9 @@ def create_app(config_object: type = Config) -> Flask:
     init_database(app)
     app.register_blueprint(auth_bp)
     app.register_blueprint(api_bp)
+    app.register_blueprint(client_bp)
 
-    @app.after_request
-    def add_security_headers(response):
-        """Додає базові захисні заголовки до кожної відповіді."""
-
-        response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("X-Frame-Options", "DENY")
-        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
-        response.headers.setdefault(
-            "Content-Security-Policy",
-            "default-src 'self'; "
-            "style-src 'self' 'unsafe-inline'; "
-            "script-src 'self'; "
-            "img-src 'self' data:; "
-            "base-uri 'self'; "
-            "form-action 'self'; "
-            "frame-ancestors 'none'",
-        )
-        return response
+    install_security_middleware(app)
 
     @app.errorhandler(400)
     def bad_request(error):

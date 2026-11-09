@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+
+{% block body_class %}client-page{% endblock %}
+{% block title %}CORS-політика · Secure DocVault{% endblock %}
+
+{% block content %}
+<main class="client-shell">
+  <header class="lab-head">
+    {% include "_brand.html" %}
+    <nav class="api-head-actions" aria-label="Навігація">
+      <a class="btn btn--ghost" href="{{ url_for('client.lab_index') }}">Клієнтський захист</a>
+      <a class="btn btn--ghost" href="{{ url_for('auth.index') }}">
+        {{ icon('arrow', 'icon--back') }}<span>Назад</span>
+      </a>
+    </nav>
+  </header>
+
+  <section class="client-hero">
+    <p class="eyebrow"><span class="pulse-dot"></span> Cross-Origin Resource Sharing / explicit whitelist</p>
+    <h1>Жодного <span class="grad">wildcard *.</span></h1>
+    <p class="lede">
+      Браузер дозволяє JavaScript читати відповідь іншого Origin лише тоді,
+      коли сервер явно повернув <code>Access-Control-Allow-Origin</code> із
+      цим самим Origin. Secure DocVault дозволяє лише перелічені в
+      <code>CORS_ALLOWED_ORIGINS</code> адреси.
+    </p>
+    {% include "_client_nav.html" %}
+  </section>
+
+  <div class="client-grid" id="cors-compare">
+    <section class="panel cors-card cors-card--ok">
+      <div class="panel__head">
+        <h2>Дозволений Origin</h2>
+        <span class="status-chip status-chip--ok">ALLOWED</span>
+      </div>
+      <p class="cors-origin mono">{{ allowed.origin }}</p>
+      <dl class="cors-facts">
+        <div><dt>Access-Control-Allow-Origin</dt><dd class="mono">{{ allowed.acao or "—" }}</dd></div>
+        <div><dt>Access-Control-Allow-Credentials</dt><dd class="mono">{{ allowed.credentials or "—" }}</dd></div>
+        <div><dt>Access-Control-Allow-Methods</dt><dd class="mono">{{ allowed.methods or "—" }}</dd></div>
+        <div><dt>Vary</dt><dd class="mono">{{ allowed.vary or "—" }}</dd></div>
+        <div><dt>HTTP</dt><dd class="mono">{{ allowed.status }}</dd></div>
+      </dl>
+      <p class="cors-note">Браузер дозволяє читання відповіді для цього Origin.</p>
+    </section>
+
+    <section class="panel cors-card cors-card--bad">
+      <div class="panel__head">
+        <h2>Сторонній Origin</h2>
+        <span class="status-chip status-chip--bad">BLOCKED BY BROWSER</span>
+      </div>
+      <p class="cors-origin mono">{{ denied.origin }}</p>
+      <dl class="cors-facts">
+        <div><dt>Access-Control-Allow-Origin</dt><dd class="mono">{{ denied.acao or "— (header відсутній)" }}</dd></div>
+        <div><dt>Access-Control-Allow-Credentials</dt><dd class="mono">{{ denied.credentials or "—" }}</dd></div>
+        <div><dt>Access-Control-Allow-Methods</dt><dd class="mono">{{ denied.methods or "—" }}</dd></div>
+        <div><dt>Vary</dt><dd class="mono">{{ denied.vary or "—" }}</dd></div>
+        <div><dt>HTTP</dt><dd class="mono">{{ denied.status }}</dd></div>
+      </dl>
+      <p class="cors-note">Сервер не підтвердив Origin, тому браузер не віддає тіло відповіді скрипту.</p>
+    </section>
+  </div>
+
+  <section class="panel" id="cors-preflight">
+    <div class="panel__head">
+      <h2>Preflight OPTIONS</h2>
+      <span class="badge badge--ok">non-simple request</span>
+    </div>
+    <dl class="cors-facts cors-facts--wide">
+      <div><dt>Origin</dt><dd class="mono">{{ preflight.origin }}</dd></div>
+      <div><dt>Request method</dt><dd class="mono">{{ preflight.method }} {{ preflight.path }}</dd></div>
+      <div><dt>Allow-Methods</dt><dd class="mono">{{ preflight.methods or "—" }}</dd></div>
+      <div><dt>Allow-Headers</dt><dd class="mono">{{ preflight.headers or "—" }}</dd></div>
+      <div><dt>Max-Age</dt><dd class="mono">600</dd></div>
+      <div><dt>HTTP</dt><dd class="mono">{{ preflight.status }}</dd></div>
+    </dl>
+    <p class="api-note">
+      Для стороннього Origin сервер не повертає <code>Access-Control-Allow-Origin</code>,
+      тому навіть успішна HTTP-відповідь не стає доступною JavaScript іншого сайту.
+    </p>
+  </section>
+
+  <section class="panel" id="cors-config">
+    <div class="panel__head">
+      <h2>Налаштування</h2>
+      <span class="badge">CORS_ALLOWED_ORIGINS</span>
+    </div>
+    <ul class="config-list">
+      {% for origin in allowed_origins %}
+        <li><code>{{ origin }}</code><span class="flag flag--ok">allowed</span></li>
+      {% endfor %}
+      <li><code>*</code><span class="flag flag--off">заборонено</span></li>
+    </ul>
+  </section>
+</main>
+{% endblock %}

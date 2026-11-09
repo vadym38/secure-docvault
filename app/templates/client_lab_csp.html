@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+
+{% block body_class %}client-page{% endblock %}
+{% block title %}CSP-лабораторія · Secure DocVault{% endblock %}
+
+{% block content %}
+<main class="client-shell">
+  <header class="lab-head">
+    {% include "_brand.html" %}
+    <nav class="api-head-actions" aria-label="Навігація">
+      <a class="btn btn--ghost" href="{{ url_for('client.lab_index') }}">Клієнтський захист</a>
+      <a class="btn btn--ghost" href="{{ url_for('auth.index') }}">
+        {{ icon('arrow', 'icon--back') }}<span>Назад</span>
+      </a>
+    </nav>
+  </header>
+
+  <section class="client-hero">
+    <p class="eyebrow"><span class="pulse-dot"></span> CSP enforcement / no unsafe-inline</p>
+    <h1>Браузер сам <span class="grad">відхиляє ін'єкцію.</span></h1>
+    <p class="lede">
+      На цій сторінці навмисно присутні три XSS-вектори: inline-скрипт,
+      inline-обробник <code>onerror</code> та скрипт, впорснутий через DOM.
+      Усі вони блокуються політикою <code>script-src 'self'</code> ще до
+      виконання. Нижче — реальні повідомлення консолі браузера.
+    </p>
+    {% include "_client_nav.html" %}
+  </section>
+
+  <!-- Цей зовнішній файл реєструє listener ДО появи inline-скрипта. -->
+  <script src="{{ url_for('static', filename='js/client_lab_csp.js') }}"></script>
+
+  <div class="client-grid client-grid--wide">
+    <section class="panel attack-panel">
+      <div class="panel__head">
+        <h2>Три спроби ін'єкції</h2>
+        <span class="badge badge--bad">attack surface</span>
+      </div>
+
+      <div class="attack-code">
+        <span class="result-label">Inline script у розмітці</span>
+        <pre class="code-block code-block--danger">&lt;script&gt;window.__xssExecuted = true; alert('XSS');&lt;/script&gt;</pre>
+      </div>
+
+      <div class="attack-code">
+        <span class="result-label">Inline event handler</span>
+        <pre class="code-block code-block--danger">&lt;img src=x onerror="window.__xssExecuted = true; alert('XSS')"&gt;</pre>
+      </div>
+
+      <div class="attack-actions">
+        <button id="btn-dom-xss" class="btn btn--secondary btn--small" type="button">
+          {{ icon('terminal') }}<span>Впорснути script через DOM</span>
+        </button>
+        <span class="mono" id="dom-attempts">0 спроб</span>
+      </div>
+
+      <div class="attack-status">
+        <div class="attack-status__row">
+          <span>Inline script</span>
+          <strong id="inline-status" data-state="pending">перевірка…</strong>
+        </div>
+        <div class="attack-status__row">
+          <span>Inline onerror</span>
+          <strong id="handler-status" data-state="pending">перевірка…</strong>
+        </div>
+        <div class="attack-status__row">
+          <span>DOM injection</span>
+          <strong id="dom-status" data-state="idle">очікує натискання</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel console-panel">
+      <div class="console-bar">
+        <span class="console-dot"></span><span class="console-dot"></span><span class="console-dot"></span>
+        <em>DevTools Console · Security</em>
+        <span class="console-count" id="console-count">0</span>
+      </div>
+      <pre id="console-lines" class="console-lines">Очікування повідомлень CSP…</pre>
+      <p class="console-note">
+        Повідомлення надходять із реального browser log (Edge/CDP) та подій
+        <code>securitypolicyviolation</code>.
+      </p>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="panel__head">
+      <h2>Зафіксовані порушення CSP</h2>
+      <span class="badge" id="violation-count">0 подій</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>Директива</th><th>Заблокований URI</th><th>Джерело</th><th>Рядок</th></tr>
+        </thead>
+        <tbody id="csp-events-body">
+          <tr><td colspan="4" class="empty-cell">Подій ще немає.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="api-note">
+      Політика: <code>{{ csp_policy }}</code>
+    </p>
+  </section>
+
+  <section class="panel policy-panel">
+    <div class="panel__head">
+      <h2>Чому це працює</h2>
+      <span class="badge badge--ok">defense in depth</span>
+    </div>
+    <div class="policy-grid">
+      <article>
+        <h3>Без <code>unsafe-inline</code></h3>
+        <p>Браузер не виконує ні inline-скрипти, ні inline-атрибути <code>on*</code>, навіть якщо вони є в HTML.</p>
+      </article>
+      <article>
+        <h3>Лише <code>'self'</code></h3>
+        <p>Скрипти дозволені тільки з власного Origin. Сторонній CDN або <code>data:</code> не виконається.</p>
+      </article>
+      <article>
+        <h3><code>frame-ancestors 'none'</code></h3>
+        <p>Сторінку не можна вбудувати в iframe, тому Clickjacking втрачає сенс.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- Навмисно вразлива розмітка: CSP має її заблокувати. -->
+  <script>window.__xssExecuted = true; window.__inlineRan = true; alert('XSS');</script>
+  <img src="{{ url_for('static', filename='missing-csp-probe.png') }}" alt=""
+       onerror="window.__xssExecuted = true; window.__handlerRan = true; alert('XSS');">
+</main>
+{% endblock %}

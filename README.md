@@ -1,9 +1,9 @@
-# Secure DocVault — етап 2: безпечний REST API та JWT
+# Secure DocVault — етап 3: клієнтський захист і конфігурація вебсервера
 
-Навчальний проєкт до лабораторних робіт №1–2 з дисципліни
+Навчальний проєкт до лабораторних робіт №1–3 з дисципліни
 **«Технології захисту інформаційних ресурсів»**.
 
-Реалізовано два шари IAM корпоративного порталу **Secure DocVault**:
+Реалізовано три шари захисту корпоративного порталу **Secure DocVault**:
 
 1. **ЛР №1 — автентифікація та захист БД:** реєстрація, вхід, безпечне
    зберігання паролів у SQLite, захист від SQL-ін'єкцій, CSRF і session
@@ -12,18 +12,42 @@
    токенів із підписом HS256, криптографічна валідація кожного запиту,
    Refresh Token Rotation, виявлення повторного використання (reuse) та
    захищений маршрут `/api/v1/user/profile`.
+3. **ЛР №3 — клієнтський захист:** санітизація вводу через Bleach,
+   контекстне екранування виводу, CSP без `unsafe-inline`, безпечні
+   cookie (`HttpOnly`, `Secure`, `SameSite=Strict`), HSTS, `nosniff`,
+   `X-Frame-Options: DENY` та CORS із явним whitelist Origin.
 
 Замість десктопного PyQt-інтерфейсу з прикладу зроблено **веб-інтерфейс
-на Flask + Jinja2** з авторським темним дизайном «Obsidian Vault» та
-інтерактивною JWT-лабораторією `/api-lab`.
+на Flask + Jinja2** з авторським темним дизайном «Obsidian Vault»,
+інтерактивною JWT-лабораторією `/api-lab` та стендом клієнтського
+захисту `/client-lab`.
 
-> **Статус:** виконано ЛР №1 (тег `v0.1-auth-db`) і ЛР №2
-> (тег `v0.2-jwt-api`). WAF, шифрування файлів та цифрові підписи з
-> наступних етапів навмисно не додані.
+> **Статус:** виконано ЛР №1 (тег `v0.1-auth-db`), ЛР №2
+> (тег `v0.2-jwt-api`) і ЛР №3 (тег `v0.3-client-security`). WAF,
+> шифрування файлів та цифрові підписи з наступних етапів навмисно не
+> додані.
 
 ---
 
 ## 1. Що демонструє проєкт
+
+### ЛР №3 — клієнтський захист і безпечний вебсервер
+
+| Вимога ЛР | Реалізація |
+|---|---|
+| Санітизація вводу (Stored/Reflected XSS) | `app/sanitizer.py`: Bleach 6.4, політика без HTML-тегів, окремі правила для тексту й імені файлу |
+| Контекстне екранування виводу | Jinja2 autoescape + `escape_text()`; санітизований текст зберігається в `client_notes` |
+| `HttpOnly` | `SESSION_COOKIE_HTTPONLY = True`, демонстраційні cookie через `set_cookie(httponly=True)` |
+| `Secure` | `SESSION_COOKIE_SECURE` (env), demo-cookie завжди `Secure`; перевірено в Edge на `127.0.0.1` |
+| `SameSite=Strict` | `SESSION_COOKIE_SAMESITE = "Strict"` для сесії та demo-cookie |
+| CSP без `unsafe-inline`, `script-src 'self'` | `app/security.py`: `CSP_POLICY`, `report-uri /client-lab/csp-report` |
+| HSTS | `Strict-Transport-Security: max-age=31536000; includeSubDomains` |
+| `nosniff` | `X-Content-Type-Options: nosniff` |
+| Clickjacking | `X-Frame-Options: DENY` + `frame-ancestors 'none'` |
+| Referrer-Policy | `strict-origin-when-cross-origin` |
+| CORS без `*` | `CORS_ALLOWED_ORIGINS` — явний whitelist Origin, `Vary: Origin` |
+| Тестування | 44 нові тести: 22 unit (санітизатор), 16 інтеграційних, 6 Selenium E2E |
+| Звіт | `docs/screenshots 3/`, `docs/client_security_architecture.html` |
 
 ### ЛР №2 — JWT та Stateless API
 
@@ -61,6 +85,7 @@
 - **Python 3.10+** (перевірено на Python 3.14.7)
 - **Flask 3.1** + Jinja2 — серверний рендеринг і REST API
 - **PyJWT 2.15** — підпис та валідація JWT (HS256)
+- **Bleach 6.4** — санітизація HTML/JS-векторів у користувацькому вводі
 - **SQLite** — локальна реляційна БД, режим WAL
 - **bcrypt 5.0** — хешування паролів, work factor 12
 - **HTML/CSS/vanilla JS** — адаптивний інтерфейс без зовнішніх CDN
@@ -81,17 +106,29 @@ secure-docvault/
 │   ├── auth.py                  # веб-маршрути, CSRF, сесії, SQLi-стенд, /api-lab
 │   ├── auth_security.py         # bcrypt, валідація пароля/username/email
 │   ├── api.py                   # REST API v1: login, refresh, logout, profile
+│   ├── client_security.py       # ЛР №3: стенд /client-lab (XSS, CSP, cookies, CORS)
+│   ├── sanitizer.py             # ЛР №3: Bleach-санітизація та звіт про вектори
+│   ├── security.py              # ЛР №3: CSP, HSTS, nosniff, XFO, CORS-middleware
 │   ├── jwt_service.py           # випуск/декодування JWT, заборона alg:none
-│   ├── config.py                # конфігурація з .env (сесії + JWT)
-│   ├── database.py              # users, refresh_tokens, access_token_revocations
+│   ├── config.py                # конфігурація з .env (сесії, JWT, CORS)
+│   ├── database.py              # users, refresh_tokens, client_notes
 │   ├── static/
 │   │   ├── css/app.css          # тема «Obsidian Vault»
 │   │   ├── js/app.js            # strength meter, показ пароля, flash
-│   │   └── js/api_lab.js        # fetch-протокол JWT, декодер, tamper, rotation
+│   │   ├── js/api_lab.js        # fetch-протокол JWT, декодер, tamper, rotation
+│   │   ├── js/client_lab.js     # швидкі XSS-payload у формі санітизатора
+│   │   ├── js/client_lab_csp.js # securitypolicyviolation → консоль/таблиця
+│   │   └── js/client_lab_cookies.js # демонстрація document.cookie
 │   └── templates/
 │       ├── _brand.html
+│       ├── _client_nav.html
 │       ├── _icons.html
 │       ├── api_lab.html         # інтерактивний JWT-стенд
+│       ├── client_lab.html      # санітизатор і збережені описи
+│       ├── client_lab_csp.html  # навмисні inline-вектори для CSP
+│       ├── client_lab_cookies.html
+│       ├── client_lab_headers.html
+│       ├── client_lab_cors.html
 │       ├── auth_base.html
 │       ├── base.html
 │       ├── dashboard.html
@@ -102,6 +139,8 @@ secure-docvault/
 ├── docs/
 │   ├── screenshots/             # 9 скриншотів ЛР №1
 │   ├── screenshots 2/           # 10 скриншотів ЛР №2
+│   ├── screenshots 3/           # скриншоти ЛР №3
+│   ├── client_security_architecture.html # схема ешелонованого захисту
 │   ├── jwt_architecture.html    # схема обміну токенами
 │   ├── jwt_db_snapshot.html     # HTML-знімок refresh_tokens
 │   ├── architecture.html        # схема входу ЛР №1
@@ -109,6 +148,7 @@ secure-docvault/
 ├── scripts/
 │   ├── capture_screenshots.py   # скриншоти ЛР №1
 │   ├── capture_screenshots_lab2.py  # скриншоти ЛР №2
+│   ├── capture_screenshots_lab3.py  # скриншоти ЛР №3
 │   ├── jwt_db_snapshot.py       # HTML-знімок refresh_tokens
 │   ├── db_snapshot.py           # HTML-знімок users
 │   └── seed_demo.py             # створення демо-користувача
@@ -118,7 +158,10 @@ secure-docvault/
 │   ├── test_web_e2e.py          # 9 E2E-тестів ЛР №1
 │   ├── test_jwt_service.py      # 8 юніт-тестів JWT
 │   ├── test_api.py              # 19 інтеграційних тестів API
-│   └── test_api_web_e2e.py      # 1 E2E-тест JWT-стенда
+│   ├── test_api_web_e2e.py      # 1 E2E-тест JWT-стенда
+│   ├── test_sanitizer.py        # 22 юніт-тести ЛР №3
+│   ├── test_client_security.py  # 16 інтеграційних тестів ЛР №3
+│   └── test_client_security_e2e.py # 6 Selenium E2E-тестів ЛР №3
 ├── .env.example
 ├── .gitignore
 ├── README.md
@@ -203,6 +246,18 @@ PORT=5000
 | GET/POST | `/security-lab` | навчальний read-only SQLi-стенд |
 | GET | `/api-lab` | інтерактивний стенд JWT (ЛР №2) |
 | GET | `/healthz` | службовий JSON health-check |
+
+### Клієнтський захист (ЛР №3)
+
+| Метод | Маршрут | Призначення |
+|---|---|---|
+| GET | `/client-lab` | огляд, форма санітизатора, збережені описи |
+| POST | `/client-lab/sanitize` | санітизація XSS-payload + запис у `client_notes` |
+| GET | `/client-lab/csp` | навмисні inline-вектори та журнал порушень CSP |
+| POST | `/client-lab/csp-report` | приймальник `report-uri` (204 No Content) |
+| GET | `/client-lab/cookies` | інспектор `HttpOnly` / `Secure` / `SameSite` |
+| GET | `/client-lab/headers` | матриця та фактичні заголовки відповіді |
+| GET | `/client-lab/cors` | дозволений, сторонній Origin і preflight |
 
 ### REST API v1 (ЛР №2)
 
@@ -293,6 +348,23 @@ CREATE TABLE IF NOT EXISTS access_token_revocations (
 
 Це blacklist для Access-токенів після logout: запис живе до їхнього
 природного `exp`, після чого токен і так недійсний.
+
+### `client_notes` (ЛР №3)
+
+```sql
+CREATE TABLE IF NOT EXISTS client_notes (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    author          TEXT    NOT NULL DEFAULT 'guest',
+    filename        TEXT    NOT NULL,
+    description     TEXT    NOT NULL,
+    blocked_vectors TEXT    NOT NULL DEFAULT '',
+    created_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+```
+
+У `description` і `filename` записується **уже санітизований** текст.
+Поле `blocked_vectors` зберігає перелік нейтралізованих тегів/обробників
+для навчального протоколу; сирий HTML у БД не потрапляє.
 
 ---
 
@@ -403,13 +475,94 @@ Access-токен після logout відхиляється з `401 token_revok
 
 - CSRF-токен у кожній POST-формі, перевірка через `hmac.compare_digest`;
 - `session.clear()` після входу — захист від session fixation;
-- cookie: `HttpOnly`, `SameSite=Lax`, `Secure` вмикається через `.env`;
+- cookie: `HttpOnly`, `SameSite=Strict` (ЛР №3), `Secure` вмикається через `.env`;
 - єдине повідомлення про помилку входу — не розкриває, чи існує акаунт;
 - dummy bcrypt-перевірка для неіснуючого користувача — вирівнює час
   відповіді та ускладнює user enumeration;
 - security headers: `Content-Security-Policy`, `X-Content-Type-Options`,
   `X-Frame-Options`, `Referrer-Policy`;
 - пароль не логується і не повертається у відповідях API.
+
+### 7.8. Санітизація вводу (ЛР №3)
+
+`app/sanitizer.py` розділяє три контексти:
+
+```python
+def sanitize_text(text, *, max_length=2000, strip_blocks=False):
+    value = _normalize(text)                 # NFC + видалення control chars
+    if strip_blocks:
+        value = DANGEROUS_BLOCK_RE.sub(" ", value)  # script/style/svg...
+    value = _plain_text(value)               # bleach.clean(tags=[], strip=True)
+    return html.unescape(value).strip()[:max_length]
+```
+
+- **Текст (описи, коментарі):** Bleach забороняє всі HTML-теги,
+  `strip=True` прибирає розмітку, але залишає безпечний текстовий вміст.
+- **Ім'я файлу:** додатково видаляються небезпечні контейнери разом із
+  вмістом, відсікаються шляхи (`../`, `C:\`), заборонені символи
+  замінюються на `_`, а зарезервовані імена Windows (`CON`, `PRN`, ...)
+  отримують префікс `_`.
+- **Оцінка загроз:** `inspect_sanitization()` повертає `removed_tags`,
+  `removed_handlers`, `blocked_protocols` — саме це показує сторінка
+  `/client-lab` після надсилання payload.
+- **Екранування виводу:** Jinja2 autoescape перетворює залишкові
+  `<`, `>`, `&` на сутності; для не-HTML контекстів є `escape_text()`.
+
+### 7.9. CSP без `unsafe-inline` (ЛР №3)
+
+```
+default-src 'self'; base-uri 'self'; object-src 'none';
+frame-ancestors 'none'; form-action 'self';
+script-src 'self'; style-src 'self'; img-src 'self' data:;
+font-src 'self'; connect-src 'self';
+report-uri /client-lab/csp-report
+```
+
+Увесь JavaScript винесено у `app/static/js/*.js`; inline-скрипти та
+inline-обробники `on*` не виконуються. Сторінка `/client-lab/csp`
+навмисно містить `<script>` і `<img onerror>` — браузер блокує їх і
+надсилає звіт на `report-uri`, а консоль фіксує
+`Refused to execute inline script because it violates CSP`.
+
+### 7.10. Безпечні cookie (ЛР №3)
+
+| Атрибут | Значення | Що блокує |
+|---|---|---|
+| `HttpOnly` | увімкнено | читання сесії через `document.cookie` при XSS |
+| `Secure` | увімкнено (env/demo) | передачу cookie через відкритий HTTP |
+| `SameSite=Strict` | увімкнено | cross-site відправку cookie → CSRF |
+| `Path=/` | явно | надмірне розширення області дії |
+
+`/client-lab/cookies` встановлює `docvault_demo_session` (HttpOnly) і
+`docvault_demo_csrf` (публічний, без HttpOnly) та показує різницю між
+серверним сховищем і `document.cookie`.
+
+### 7.11. Захисні заголовки (ЛР №3)
+
+| Заголовок | Значення | Загроза |
+|---|---|---|
+| `Content-Security-Policy` | див. 7.9 | XSS, inline-код, `data:`-скрипти |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` | SSL-stripping / downgrade |
+| `X-Content-Type-Options` | `nosniff` | MIME-sniffing |
+| `X-Frame-Options` | `DENY` | Clickjacking |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | витік URL із токенами |
+| `Permissions-Policy` | `geolocation=(), microphone=(), camera=()` | доступ до пристроїв |
+| `X-Permitted-Cross-Domain-Policies` | `none` | cross-domain policy-файли |
+
+Заголовки додаються в `after_request`-middleware (`app/security.py`) до
+**кожної** відповіді, включно з REST API та сторінками помилок.
+
+### 7.12. CORS із явним whitelist (ЛР №3)
+
+- `CORS_ALLOWED_ORIGINS` — список конкретних Origin; `*` не
+  підтримується і ніколи не повертається.
+- Для дозволеного Origin сервер повертає `Access-Control-Allow-Origin`
+  з його точним значенням, `Allow-Credentials: true`, `Allow-Methods`,
+  `Allow-Headers`, `Max-Age: 600`.
+- Для стороннього Origin `Access-Control-Allow-Origin` **не
+  встановлюється**, тому браузер не віддає тіло відповіді скрипту.
+- `Vary: Origin` додається завжди, щоб проміжні кеші не змішували
+  відповіді для різних Origin.
 
 ---
 
@@ -497,7 +650,7 @@ python -m unittest discover -v
 **Результат на момент здачі:**
 
 ```text
-Ran 62 tests in 27.7s
+Ran 106 tests in 35.0s
 OK
 ```
 
@@ -509,6 +662,9 @@ OK
 | `test_jwt_service.py` | 8 | клейми, TTL, підпис, `alg:none`, чужий ключ, fail-closed |
 | `test_api.py` | 19 | login, profile, tamper, rotation, reuse, logout, кеш |
 | `test_api_web_e2e.py` | 1 | повний JWT-протокол у Edge headless |
+| `test_sanitizer.py` | 22 | Bleach, небезпечні теги, шляхи, reserved names, звіт |
+| `test_client_security.py` | 16 | CSP, HSTS, XFO, CORS, cookie flags, CSRF, sanitize POST |
+| `test_client_security_e2e.py` | 6 | CSP-блокування в Edge, document.cookie, cookie flags, форма |
 
 Окремі групи:
 
@@ -517,6 +673,8 @@ python -m unittest tests.test_security tests.test_database -v
 python -m unittest tests.test_web_e2e -v
 python -m unittest tests.test_jwt_service tests.test_api -v
 python -m unittest tests.test_api_web_e2e -v
+python -m unittest tests.test_sanitizer tests.test_client_security -v
+python -m unittest tests.test_client_security_e2e -v
 ```
 
 ### Ручна перевірка JWT-протоколу
@@ -533,9 +691,57 @@ python -m unittest tests.test_api_web_e2e -v
 8. **Reuse** — повторне використання старого Refresh-токена:
    `401 refresh_token_reuse`, родину відкликано.
 
+### Ручна перевірка клієнтського захисту
+
+1. Запустіть `python run.py` і відкрийте `/client-lab`.
+2. У формі санітизатора введіть `<script>alert('XSS')</script>` та
+   `<img src=x onerror=alert(1)>` — результат покаже очищений текст і
+   перелік нейтралізованих векторів; alert не з'явиться.
+3. Відкрийте `/client-lab/csp` — DevTools Console містить
+   `Executing inline script violates ... script-src 'self'`.
+4. Відкрийте `/client-lab/cookies` → DevTools → Application → Cookies:
+   `docvault_session` і `docvault_demo_session` мають `HttpOnly`,
+   `Secure`, `SameSite=Strict`.
+5. Виконайте `curl -I http://127.0.0.1:5000/client-lab` — у відповіді
+   будуть CSP, HSTS, `nosniff`, `X-Frame-Options: DENY`,
+   `Referrer-Policy`.
+6. Відкрийте `/client-lab/cors` — дозволений Origin отримує
+   `Access-Control-Allow-Origin`, сторонній — ні.
+
 ---
 
 ## 10. Скриншоти та звіт
+
+### ЛР №3 — `docs/screenshots 3/`
+
+Автоматично згенерувати всі скриншоти:
+
+```bash
+python scripts/capture_screenshots_lab3.py
+```
+
+Скрипт піднімає сервер на тимчасовій БД, виконує реальний `curl -I`,
+відкриває сторінки в Edge headless, збирає browser log і `get_cookies()`,
+після чого зберігає PNG.
+
+| Файл | Що демонструє |
+|---|---|
+| `00-client-lab-overview.png` | оглядова сторінка `/client-lab` |
+| `01-curl-headers.png` | реальний `curl -I` з CSP, HSTS, nosniff, XFO, Referrer-Policy |
+| `02-csp-console.png` | DevTools Console: `Refused to execute inline script` і таблиця порушень |
+| `03-csp-blocked-status.png` | статуси `BLOCKED` для inline script / onerror / DOM injection |
+| `04-cookies-devtools.png` | DevTools Application → Cookies: HttpOnly, Secure, SameSite=Strict |
+| `05-document-cookie.png` | `document.cookie` без HttpOnly-сесії |
+| `06-sanitized-xss.png` | XSS-payload у формі та очищений результат Bleach |
+| `07-sanitized-stored-note.png` | збережений опис у `client_notes` без HTML |
+| `08-headers-matrix.png` | матриця заголовків і фактична відповідь API |
+| `09-cors-allowed-denied.png` | дозволений Origin vs сторонній Origin |
+| `10-cors-preflight.png` | preflight OPTIONS із дозволеними методами/заголовками |
+| `11-cors-whitelist.png` | налаштування `CORS_ALLOWED_ORIGINS` без `*` |
+| `12-client-security-architecture.png` | схема ешелонованого захисту |
+
+Додатковий матеріал: `docs/client_security_architecture.html` — схема
+чотирьох рівнів (sanitize → escape → CSP → cookie/CORS).
 
 ### ЛР №2 — `docs/screenshots 2/`
 
@@ -596,6 +802,7 @@ python scripts/capture_screenshots.py
 git tag
 # v0.1-auth-db
 # v0.2-jwt-api
+# v0.3-client-security
 ```
 
 Перевірити історію:
@@ -625,6 +832,9 @@ python scripts/db_snapshot.py
 # HTML-знімок refresh_tokens (ЛР №2)
 python scripts/jwt_db_snapshot.py --db instance/lab2_demo.db
 
+# скриншоти ЛР №3
+python scripts/capture_screenshots_lab3.py
+
 # перевірити health-check
 http://127.0.0.1:5000/healthz
 http://127.0.0.1:5000/api/v1/health
@@ -641,13 +851,33 @@ http://127.0.0.1:5000/api/v1/health
 - немає шифрування файлів — ЛР №5;
 - немає цифрових підписів — ЛР №6;
 - JWT зберігаються на клієнті в пам'яті стенда; у production-фронтенді
-  Refresh-токен варто тримати в `HttpOnly Secure` cookie;
+  Refresh-токен варто тримати в `HttpOnly Secure SameSite=Strict` cookie;
+- `Secure`-cookie та HSTS повноцінно працюють лише за HTTPS; на
+  `localhost`/`127.0.0.1` браузер вважає Origin trustworthy, тому
+  демонстраційні Secure-cookie зберігаються і без TLS;
 - SQLite обрано для локального навчального стенда; для production
   передбачається PostgreSQL/MySQL із тими самими параметризованими
   запитами та спільним revoke-сховищем (Redis).
 
 ---
 
-## 14. Ліцензія
+## 14. Висновок до ЛР №3
+
+Клієнтський захист Secure DocVault побудовано за принципом Defense in
+Depth: санітизація Bleach нейтралізує XSS-вектори ще до запису в
+`client_notes`, Jinja2 autoescape страхує вивід, CSP із `script-src
+'self'` без `unsafe-inline` не дає браузеру виконати ні inline-скрипт,
+ні атрибут `onerror` навіть за наявності вразливого поля, а
+`HttpOnly` + `Secure` + `SameSite=Strict` закривають викрадення сесії та
+CSRF. Додаткові HSTS, `nosniff`, `X-Frame-Options: DENY`,
+`Referrer-Policy` і CORS-whitelist усувають downgrade, MIME-sniffing,
+Clickjacking і несанкціоноване міжсайтове читання API. Тести (22 unit,
+16 інтеграційних, 6 Selenium E2E) підтверджують, що кожен рівень працює
+незалежно, тому компрометація одного механізму не відкриває весь
+периметр.
+
+---
+
+## 15. Ліцензія
 
 Навчальний проєкт. Використовуйте лише для освітніх цілей.

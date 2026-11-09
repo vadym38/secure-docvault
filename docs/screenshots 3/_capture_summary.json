@@ -1,0 +1,44 @@
+{
+  "generated_at": "2026-11-09T13:56:47+00:00",
+  "base_url": "http://127.0.0.1:56383",
+  "curl_command": "curl -I http://127.0.0.1:56383/client-lab",
+  "csp_messages": [
+    "http://127.0.0.1:56383/client-lab/csp 171 Executing inline script violates the following Content Security Policy directive 'script-src 'self''. Either the 'unsafe-inline' keyword, a hash ('sha256-tFDuD7tfEATcsYBRMY8h8gc8Ir5NuxNaJJaEJ3EvzIU='), or a nonce ('nonce-...') is required to enable inline execution. The action has been blocked.",
+    "http://127.0.0.1:56383/client-lab/csp - Executing inline event handler violates the following Content Security Policy directive 'script-src 'self''. Either the 'unsafe-inline' keyword, a hash ('sha256-...'), or a nonce ('nonce-...') is required to enable inline execution. Note that hashes do not apply to event handlers, style attributes and javascript: navigations unless the 'unsafe-hashes' keyword is present. The action has been blocked."
+  ],
+  "cookies": [
+    {
+      "name": "docvault_session",
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Strict"
+    },
+    {
+      "name": "docvault_demo_session",
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Strict"
+    },
+    {
+      "name": "docvault_demo_csrf",
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "Strict"
+    }
+  ],
+  "files": [
+    "00-client-lab-overview.png",
+    "01-curl-headers.png",
+    "02-csp-console.png",
+    "03-csp-blocked-status.png",
+    "04-cookies-devtools.png",
+    "05-document-cookie.png",
+    "06-sanitized-xss.png",
+    "07-sanitized-stored-note.png",
+    "08-headers-matrix.png",
+    "09-cors-allowed-denied.png",
+    "10-cors-preflight.png",
+    "11-cors-whitelist.png",
+    "12-client-security-architecture.png"
+  ]
+}

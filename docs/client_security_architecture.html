@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Secure DocVault · Клієнтський периметр (ЛР №3)</title>
+<style>
+  :root {
+    --bg: #05080b;
+    --panel: #0c141b;
+    --panel-2: #101b24;
+    --line: rgba(151, 193, 208, 0.16);
+    --line-strong: rgba(151, 193, 208, 0.3);
+    --text: #e9f3f3;
+    --muted: #8aa1a9;
+    --muted-2: #647a83;
+    --mint: #72f2c6;
+    --blue: #7ab8ff;
+    --amber: #ffb86b;
+    --rose: #ff7c91;
+    --mono: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+    --display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    padding: 44px 48px 56px;
+    color: var(--text);
+    font-family: var(--display);
+    background:
+      radial-gradient(900px 520px at 82% -8%, rgba(122, 184, 255, 0.13), transparent 62%),
+      radial-gradient(800px 480px at 4% 10%, rgba(114, 242, 198, 0.09), transparent 58%),
+      var(--bg);
+  }
+  header { max-width: 1320px; margin: 0 auto 30px; }
+  .eyebrow {
+    display: flex; align-items: center; gap: 9px;
+    margin: 0 0 12px; color: var(--mint);
+    font-family: var(--mono); font-size: 12px;
+    letter-spacing: 0.16em; text-transform: uppercase;
+  }
+  .pulse {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--mint); box-shadow: 0 0 0 5px rgba(114, 242, 198, 0.12);
+  }
+  h1 {
+    margin: 0; max-width: 980px;
+    font-size: 46px; line-height: 1.02; letter-spacing: -0.045em;
+  }
+  .grad {
+    background: linear-gradient(100deg, var(--mint), #a8ffdf 45%, var(--blue));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .lede {
+    max-width: 960px; margin: 16px 0 0;
+    color: #c3d4d8; font-size: 15px; line-height: 1.6;
+  }
+  .flow {
+    display: grid;
+    grid-template-columns: 1fr 46px 1fr 46px 1fr 46px 1fr;
+    align-items: stretch;
+    gap: 0;
+    max-width: 1320px; margin: 0 auto 26px;
+  }
+  .node {
+    position: relative; padding: 22px 20px 20px;
+    border: 1px solid var(--line); border-radius: 18px;
+    background: linear-gradient(160deg, rgba(255,255,255,0.045), rgba(255,255,255,0.008));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+  .node__num {
+    position: absolute; top: -13px; left: 18px;
+    padding: 3px 10px; border-radius: 999px;
+    color: #04110d; background: linear-gradient(135deg, var(--mint), #4ce4b5);
+    font-family: var(--mono); font-size: 11px; font-weight: 700;
+  }
+  .node h2 {
+    margin: 6px 0 10px; font-size: 18px; letter-spacing: -0.02em;
+  }
+  .node ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+  .node li {
+    display: flex; gap: 8px; align-items: flex-start;
+    color: #c3d4d8; font-size: 12.5px; line-height: 1.45;
+  }
+  .node li::before {
+    content: ""; flex: 0 0 auto; width: 6px; height: 6px;
+    margin-top: 6px; border-radius: 50%; background: var(--mint);
+  }
+  .node__tag {
+    display: inline-block; margin-top: 14px; padding: 4px 9px;
+    border: 1px solid var(--line); border-radius: 999px;
+    color: var(--muted); font-family: var(--mono); font-size: 10px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .arrow {
+    display: grid; place-items: center; color: var(--muted-2);
+    font-size: 22px;
+  }
+  .node--input { border-color: rgba(114, 242, 198, 0.3); }
+  .node--escape { border-color: rgba(122, 184, 255, 0.3); }
+  .node--browser { border-color: rgba(255, 184, 107, 0.3); }
+  .node--session { border-color: rgba(255, 124, 145, 0.3); }
+  .node--input .node li::before { background: var(--mint); }
+  .node--escape .node li::before { background: var(--blue); }
+  .node--browser .node li::before { background: var(--amber); }
+  .node--session .node li::before { background: var(--rose); }
+
+  .grid {
+    display: grid; grid-template-columns: 1.45fr 0.55fr; gap: 18px;
+    max-width: 1320px; margin: 0 auto 26px;
+  }
+  .panel {
+    padding: 22px; border: 1px solid var(--line); border-radius: 18px;
+    background: linear-gradient(160deg, rgba(255,255,255,0.035), rgba(255,255,255,0.008));
+  }
+  .panel h2 { margin: 0 0 14px; font-size: 17px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th {
+    color: var(--muted); font-family: var(--mono); font-size: 10px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  td { color: #c3d4d8; line-height: 1.45; }
+  tr:last-child td { border-bottom: 0; }
+  code {
+    color: var(--mint); font-family: var(--mono); font-size: 11.5px;
+    overflow-wrap: anywhere;
+  }
+  .node code { white-space: nowrap; font-size: 10.8px; }
+  .threat { color: var(--rose); font-family: var(--mono); font-size: 11px; white-space: nowrap; }
+  .legend { display: grid; gap: 12px; }
+  .legend__row {
+    display: grid; grid-template-columns: 10px 1fr; gap: 10px;
+    align-items: start; color: #c3d4d8; font-size: 12.5px; line-height: 1.45;
+  }
+  .dot { width: 10px; height: 10px; margin-top: 4px; border-radius: 50%; }
+  .dot--mint { background: var(--mint); }
+  .dot--blue { background: var(--blue); }
+  .dot--amber { background: var(--amber); }
+  .dot--rose { background: var(--rose); }
+  .legend strong { display: block; color: var(--text); font-size: 12.5px; }
+  .legend span { color: var(--muted); }
+  .footer {
+    max-width: 1320px; margin: 0 auto; padding: 18px 22px;
+    border: 1px solid rgba(114, 242, 198, 0.24); border-radius: 18px;
+    background: rgba(114, 242, 198, 0.055);
+    color: #c3d4d8; font-size: 13px; line-height: 1.55;
+  }
+  .footer strong { color: var(--mint); }
+</style>
+</head>
+<body>
+  <header>
+    <p class="eyebrow"><span class="pulse"></span> Client perimeter / defense in depth</p>
+    <h1>Один запит — <span class="grad">чотири незалежні бар'єри.</span></h1>
+    <p class="lede">
+      Кожен шар перевіряє дані окремо: навіть якщо один механізм буде
+      вимкнено або обійдено, наступний не дасть payload перетворитися на
+      виконуваний код, викрасти сесію або прочитати чужу відповідь API.
+    </p>
+  </header>
+
+  <section class="flow" aria-label="Потік даних">
+    <article class="node node--input">
+      <span class="node__num">01 · INPUT</span>
+      <h2>Санітизація</h2>
+      <ul>
+        <li>Bleach 6.4: <code>tags=[]</code>, <code>strip=True</code></li>
+        <li>Видалення <code>&lt;script&gt;</code>, <code>on*</code>, <code>javascript:</code></li>
+        <li>Окремі правила для імені файлу та шляху</li>
+        <li>Запис у БД лише очищеного тексту</li>
+      </ul>
+      <span class="node__tag">Stored XSS neutralized</span>
+    </article>
+    <div class="arrow" aria-hidden="true">→</div>
+
+    <article class="node node--escape">
+      <span class="node__num">02 · OUTPUT</span>
+      <h2>Екранування</h2>
+      <ul>
+        <li>Jinja2 autoescape для HTML-контексту</li>
+        <li><code>escape_text()</code> для не-HTML контекстів</li>
+        <li>Жодного <code>|safe</code> на користувацьких даних</li>
+        <li>Залишкові <code>&lt;</code> стають <code>&amp;lt;</code></li>
+      </ul>
+      <span class="node__tag">Reflected XSS neutralized</span>
+    </article>
+    <div class="arrow" aria-hidden="true">→</div>
+
+    <article class="node node--browser">
+      <span class="node__num">03 · BROWSER</span>
+      <h2>Політика браузера</h2>
+      <ul>
+        <li><code>script-src 'self'</code> без <code>unsafe-inline</code></li>
+        <li><code>frame-ancestors 'none'</code> + <code>XFO: DENY</code></li>
+        <li>HSTS, <code>nosniff</code>, Referrer-Policy</li>
+        <li><code>report-uri /client-lab/csp-report</code></li>
+      </ul>
+      <span class="node__tag">CSP enforcement</span>
+    </article>
+    <div class="arrow" aria-hidden="true">→</div>
+
+    <article class="node node--session">
+      <span class="node__num">04 · SESSION</span>
+      <h2>Сесія та Origin</h2>
+      <ul>
+        <li><code>HttpOnly</code> — недоступно з JS</li>
+        <li><code>Secure</code> — лише HTTPS / trustworthy localhost</li>
+        <li><code>SameSite=Strict</code> — без cross-site відправки</li>
+        <li>CORS whitelist без <code>*</code>, <code>Vary: Origin</code></li>
+      </ul>
+      <span class="node__tag">CSRF / session theft blocked</span>
+    </article>
+  </section>
+
+  <section class="grid">
+    <div class="panel">
+      <h2>Загроза → контроль → результат</h2>
+      <table>
+        <thead>
+          <tr><th>Загроза OWASP</th><th>Контроль</th><th>Перевірка</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>A03:2021 Injection (Stored XSS)</td>
+            <td><code>sanitize_filename()</code>, <code>sanitize_comment()</code></td>
+            <td>/client-lab/sanitize</td>
+          </tr>
+          <tr>
+            <td>A03:2021 Injection (Reflected XSS)</td>
+            <td>Jinja2 autoescape, <code>escape_text()</code></td>
+            <td>POST → /client-lab</td>
+          </tr>
+          <tr>
+            <td>A05:2021 Security Misconfiguration</td>
+            <td>CSP, HSTS, nosniff, XFO, Referrer-Policy</td>
+            <td><code>curl -I</code>, /client-lab/headers</td>
+          </tr>
+          <tr>
+            <td>Clickjacking / UI redressing</td>
+            <td><code>frame-ancestors 'none'</code>, <code>X-Frame-Options: DENY</code></td>
+            <td>response headers</td>
+          </tr>
+          <tr>
+            <td>CSRF</td>
+            <td><code>SameSite=Strict</code> + CSRF-токен форми</td>
+            <td>/client-lab/cookies</td>
+          </tr>
+          <tr>
+            <td>Session hijacking через XSS</td>
+            <td><code>HttpOnly</code>, <code>Secure</code></td>
+            <td>document.cookie, DevTools</td>
+          </tr>
+          <tr>
+            <td>Несанкціоноване cross-origin читання</td>
+            <td>CORS whitelist, <code>Vary: Origin</code></td>
+            <td>/client-lab/cors</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <aside class="panel">
+      <h2>Легенда</h2>
+      <div class="legend">
+        <div class="legend__row">
+          <span class="dot dot--mint"></span>
+          <div><strong>Вхід</strong><span>Дані очищуються до збереження.</span></div>
+        </div>
+        <div class="legend__row">
+          <span class="dot dot--blue"></span>
+          <div><strong>Вихід</strong><span>Будь-який залишок стає текстом.</span></div>
+        </div>
+        <div class="legend__row">
+          <span class="dot dot--amber"></span>
+          <div><strong>Браузер</strong><span>Політика виконується на клієнті.</span></div>
+        </div>
+        <div class="legend__row">
+          <span class="dot dot--rose"></span>
+          <div><strong>Сесія</strong><span>Cookie та Origin ізольовані.</span></div>
+        </div>
+      </div>
+    </aside>
+  </section>
+
+  <div class="footer">
+    <strong>Defense in Depth:</strong> жоден рівень не є єдиною точкою
+    відмови. Санітизація захищає БД, autoescape — шаблон, CSP — браузер,
+    а cookie/CORS — сесію та міжсайтову взаємодію. Компрометація одного
+    шару не відкриває весь периметр.
+  </div>
+</body>
+</html>

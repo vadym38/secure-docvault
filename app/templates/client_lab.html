@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+
+{% block body_class %}client-page{% endblock %}
+{% block title %}Клієнтський захист · Secure DocVault{% endblock %}
+
+{% block content %}
+<main class="client-shell">
+  <header class="lab-head">
+    {% include "_brand.html" %}
+    <nav class="api-head-actions" aria-label="Навігація">
+      <a class="btn btn--ghost" href="{{ url_for('auth.dashboard') }}">Кабінет</a>
+      <a class="btn btn--ghost" href="{{ url_for('auth.index') }}">
+        {{ icon('arrow', 'icon--back') }}<span>Назад</span>
+      </a>
+    </nav>
+  </header>
+
+  <section class="client-hero">
+    <p class="eyebrow"><span class="pulse-dot"></span> Client perimeter / defense in depth</p>
+    <h1>Фронтенд, який <span class="grad">не виконує чужий код.</span></h1>
+    <p class="lede">
+      Клієнтський периметр Secure DocVault закриває XSS, CSRF і Clickjacking
+      на чотирьох рівнях: санітизація входу, контекстне екранування виводу,
+      сувора CSP без <code>unsafe-inline</code> та безпечні cookie-контейнери.
+      Кожен блок нижче — це реальна перевірка, а не статична картинка.
+    </p>
+    {% include "_client_nav.html" %}
+  </section>
+
+  <div class="client-grid">
+    <section class="panel sanitizer-panel" id="sanitizer">
+      <div class="panel__head">
+        <h2>Санітизатор вводу</h2>
+        <span class="badge">bleach 6.4</span>
+      </div>
+
+      <form method="post" action="{{ url_for('client.sanitize_submit') }}" class="sanitizer-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <label class="field">
+          <span>Ім'я файлу</span>
+          <input class="mono" type="text" name="filename" maxlength="160"
+                 placeholder="наприклад, contract&lt;img src=x onerror=alert(1)&gt;.pdf">
+        </label>
+
+        <label class="field">
+          <span>Опис документа</span>
+          <textarea class="mono" name="description" rows="4"
+                    placeholder="Опис, який побачать інші користувачі"></textarea>
+        </label>
+
+        <label class="field">
+          <span>Коментар</span>
+          <textarea class="mono" name="comment" rows="3"
+                    placeholder="Коментар до документа"></textarea>
+        </label>
+
+        <div class="payload-row">
+          <span>Швидкі payload:</span>
+          <button class="btn btn--ghost btn--small" type="button"
+                  data-payload="script">&lt;script&gt;</button>
+          <button class="btn btn--ghost btn--small" type="button"
+                  data-payload="img">&lt;img onerror&gt;</button>
+          <button class="btn btn--ghost btn--small" type="button"
+                  data-payload="svg">&lt;svg onload&gt;</button>
+        </div>
+
+        <button class="btn btn--primary btn--wide" type="submit">
+          {{ icon('shield') }}<span>Санітизувати та зберегти</span>
+        </button>
+      </form>
+
+      <p class="api-note">
+        Максимум {{ max_text }} символів. Bleach видаляє HTML-теги, event-handler
+        атрибути та небезпечні протоколи; у базу потрапляє лише очищений текст.
+      </p>
+    </section>
+
+    <section class="panel result-panel">
+      <div class="panel__head">
+        <h2>Результат перевірки</h2>
+        {% if result %}
+          <span class="status-pill" data-state="ok">sanitized</span>
+        {% else %}
+          <span class="status-pill" data-state="idle">очікує payload</span>
+        {% endif %}
+      </div>
+
+      {% if result %}
+        <div class="result-block">
+          <span class="result-label">Оригінальний payload (екранований)</span>
+          <pre class="code-block code-block--danger">{{ result.original }}</pre>
+        </div>
+
+        <div class="result-grid">
+          <div class="result-block">
+            <span class="result-label">Безпечне ім'я файлу</span>
+            <code class="result-value">{{ result.filename }}</code>
+          </div>
+          <div class="result-block">
+            <span class="result-label">Опис після bleach</span>
+            <code class="result-value">{{ result.description or "—" }}</code>
+          </div>
+        </div>
+
+        <div class="result-block">
+          <span class="result-label">Коментар після bleach</span>
+          <code class="result-value">{{ result.comment or "—" }}</code>
+        </div>
+
+        <div class="vector-row">
+          <span class="vector-label">Нейтралізовано:</span>
+          <span class="vector-chip vector-chip--danger">{{ result.blocked }}</span>
+          {% if result.report.removed_tags %}
+            <span class="vector-chip">tags: {{ result.report.removed_tags|join(', ') }}</span>
+          {% endif %}
+          {% if result.report.removed_handlers %}
+            <span class="vector-chip">handlers: {{ result.report.removed_handlers|join(', ') }}</span>
+          {% endif %}
+        </div>
+
+        {% if result.stored %}
+          <p class="result-stored">
+            {{ icon('check') }} Очищену версію збережено в <code>client_notes</code>.
+            У браузері не виконався жоден скрипт.
+          </p>
+        {% endif %}
+      {% else %}
+        <div class="empty-state">
+          <span class="empty-state__mark">{{ icon('alert') }}</span>
+          <h3>Вставте XSS-payload у форму</h3>
+          <p>
+            Натисніть одну з кнопок швидкого payload або введіть власний код.
+            Після надсилання тут з'явиться оригінал (екранований), очищений
+            текст і перелік нейтралізованих векторів.
+          </p>
+        </div>
+      {% endif %}
+    </section>
+  </div>
+
+  <section class="panel notes-panel">
+    <div class="panel__head">
+      <h2>Збережені описи</h2>
+      <span class="badge badge--ok">stored XSS neutralized</span>
+    </div>
+
+    <div class="notes-list">
+      {% for note in notes %}
+        <article class="note-card">
+          <header>
+            <strong>{{ note.filename }}</strong>
+            <span class="mono">{{ note.created_at }}</span>
+          </header>
+          <p>{{ note.description }}</p>
+          <footer>
+            <span>author: {{ note.author }}</span>
+            <span class="note-blocked">blocked: {{ note.blocked_vectors }}</span>
+          </footer>
+        </article>
+      {% else %}
+        <p class="empty-state empty-state--inline">
+          Ще немає збережених описів. Надішліть форму вище.
+        </p>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel header-matrix" id="headers">
+    <div class="panel__head">
+      <h2>Матриця захисних заголовків</h2>
+      <a class="btn btn--ghost btn--small" href="{{ url_for('client.headers_lab') }}">
+        Фактичні заголовки {{ icon('arrow') }}
+      </a>
+    </div>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>Заголовок</th><th>Значення</th><th>Що блокує</th></tr>
+        </thead>
+        <tbody>
+          {% for item in header_matrix %}
+            <tr>
+              <td class="mono">{{ item.name }}</td>
+              <td class="mono table-value">{{ item.value }}</td>
+              <td>{{ item.threat }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="defense-grid">
+    <article>
+      <span class="icon-tile">{{ icon('shield') }}</span>
+      <h3>Санітизація входу</h3>
+      <p>Bleach видаляє теги, атрибути-обробники та <code>javascript:</code> до запису в БД.</p>
+    </article>
+    <article>
+      <span class="icon-tile">{{ icon('eye') }}</span>
+      <h3>Екранування виходу</h3>
+      <p>Jinja2 autoescape перетворює будь-який залишковий символ на текст, а не на розмітку.</p>
+    </article>
+    <article>
+      <span class="icon-tile">{{ icon('lock') }}</span>
+      <h3>Ізоляція cookie</h3>
+      <p>HttpOnly приховує сесію від <code>document.cookie</code>, SameSite=Strict зупиняє CSRF.</p>
+    </article>
+    <article>
+      <span class="icon-tile">{{ icon('terminal') }}</span>
+      <h3>CSP + CORS</h3>
+      <p>Браузер не виконує inline-код і не читає відповіді з недозволеного Origin.</p>
+    </article>
+  </section>
+</main>
+
+<script src="{{ url_for('static', filename='js/client_lab.js') }}" defer></script>
+{% endblock %}
