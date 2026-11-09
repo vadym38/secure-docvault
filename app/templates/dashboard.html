@@ -19,6 +19,9 @@
       <a class="nav-item" href="{{ url_for('auth.api_lab') }}">
         {{ icon('key') }}<span>JWT API</span>
       </a>
+      <a class="nav-item" href="{{ url_for('network.lab_index') }}">
+        {{ icon('shield') }}<span>WAF / Rate Limit</span>
+      </a>
       <span class="nav-item is-disabled" aria-disabled="true">
         {{ icon('db') }}<span>Документи</span><small>ЛР 5</small>
       </span>
@@ -35,7 +38,7 @@
           {{ icon('logout') }}<span>Завершити сесію</span>
         </button>
       </form>
-      <p class="mono console__version">v0.2-jwt-api</p>
+      <p class="mono console__version">v0.4-waf-ratelimit</p>
     </div>
   </aside>
 
@@ -100,15 +103,16 @@
       <section class="panel">
         <div class="panel__head">
           <h2>Постура безпеки</h2>
-          <span class="badge badge--ok">Stage 2</span>
+          <span class="badge badge--ok">Stage 4</span>
         </div>
         <ul class="check-list">
           <li><span class="check">{{ icon('check') }}</span>Пароль збережено як bcrypt-хеш із унікальною сіллю</li>
           <li><span class="check">{{ icon('check') }}</span>Усі SQL-запити параметризовані</li>
           <li><span class="check">{{ icon('check') }}</span>Access Token: HS256, TTL 15 хвилин</li>
           <li><span class="check">{{ icon('check') }}</span>Refresh Token: ротація + reuse detection</li>
-          <li><span class="check">{{ icon('check') }}</span>Захищений маршрут <code>/api/v1/user/profile</code></li>
-          <li class="is-next"><span class="check">{{ icon('arrow') }}</span>Наступний етап: захищений вебфронтенд</li>
+          <li><span class="check">{{ icon('check') }}</span>WAF: сигнатури, Greylist і журнал інцидентів</li>
+          <li><span class="check">{{ icon('check') }}</span>Rate Limiting: login 5/хв, API 60/хв</li>
+          <li class="is-next"><span class="check">{{ icon('arrow') }}</span>Наступний етап: захищене сховище файлів</li>
         </ul>
         <a class="btn btn--secondary" href="{{ url_for('auth.api_lab') }}">
           {{ icon('key') }}<span>Відкрити JWT API-лабораторію</span>

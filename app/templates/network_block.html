@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+
+{% block body_class %}sentinel-page{% endblock %}
+{% block title %}{{ code }} · Sentinel Gate{% endblock %}
+
+{% block content %}
+<main class="block-shell">
+  <section class="block-card">
+    <div class="block-card__mark {{ 'block-card__mark--rose' if code == 403 else 'block-card__mark--amber' }}">
+      {{ icon('shield') }}
+    </div>
+    <p class="eyebrow"><span class="pulse-dot pulse-dot--amber"></span> Sentinel gate / request blocked</p>
+    <h1 class="block-code">{{ code }}</h1>
+    <h2>{{ title }}</h2>
+    <p class="block-message">{{ message }}</p>
+
+    <dl class="block-facts">
+      <div><dt>Правило</dt><dd class="mono">{{ rule }}</dd></div>
+      {% if retry_after %}
+        <div><dt>Retry-After</dt><dd class="mono">{{ retry_after }} с</dd></div>
+      {% endif %}
+      {% if xss %}
+        <div><dt>Фрагмент сигнатури</dt><dd class="mono">{{ xss }}</dd></div>
+      {% endif %}
+    </dl>
+
+    <div class="block-actions">
+      <a class="btn btn--primary" href="{{ url_for('network.lab_index') }}">
+        {{ icon('grid') }}<span>До панелі WAF</span>
+      </a>
+      <a class="btn btn--ghost" href="{{ url_for('auth.index') }}">
+        {{ icon('arrow', 'icon--back') }}<span>На головну</span>
+      </a>
+    </div>
+  </section>
+</main>
+{% endblock %}

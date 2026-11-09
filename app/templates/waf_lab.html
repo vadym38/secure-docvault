@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+
+{% block body_class %}sentinel-page{% endblock %}
+{% block title %}Sentinel Gate · WAF і Rate Limiting{% endblock %}
+
+{% block content %}
+<main class="sentinel-shell">
+  <header class="lab-head">
+    {% include "_brand.html" %}
+    <nav class="api-head-actions" aria-label="Навігація">
+      <a class="btn btn--ghost" href="{{ url_for('client.lab_index') }}">Клієнтський захист</a>
+      <a class="btn btn--ghost" href="{{ url_for('auth.dashboard') }}">Кабінет</a>
+      <a class="btn btn--ghost" href="{{ url_for('auth.index') }}">
+        {{ icon('arrow', 'icon--back') }}<span>Назад</span>
+      </a>
+    </nav>
+  </header>
+
+  <section class="sentinel-hero">
+    <p class="eyebrow"><span class="pulse-dot pulse-dot--amber"></span> Sentinel gate / application layer</p>
+    <h1>Трафік, який <span class="grad grad--amber">проходить через контроль.</span></h1>
+    <p class="lede">
+      Перед кожним Flask-маршрутом стоять три перевірки: Greylist,
+      сигнатурний WAF і Sliding Window Rate Limiter. Запит або проходить
+      далі, або отримує <code>403 Forbidden</code> / <code>429 Too Many
+      Requests</code> ще до виконання бізнес-логіки.
+    </p>
+  </section>
+
+  <section class="sentinel-status" aria-label="Стан захисту">
+    <article class="sentinel-stat sentinel-stat--amber">
+      <span class="sentinel-stat__label">WAF</span>
+      <strong>{{ "ON" if waf_enabled else "OFF" }}</strong>
+      <small>{{ signatures|length }} сигнатур · Greylist {{ greylist_seconds }} с</small>
+    </article>
+    <article class="sentinel-stat sentinel-stat--mint">
+      <span class="sentinel-stat__label">Rate Limiter</span>
+      <strong>{{ "ON" if rate_limit_enabled else "OFF" }}</strong>
+      <small>login {{ rules[0].limit }}/{{ rules[0].window_seconds }} с · API {{ rules[1].limit }}/{{ rules[1].window_seconds }} с</small>
+    </article>
+    <article class="sentinel-stat sentinel-stat--rose">
+      <span class="sentinel-stat__label">Greylist</span>
+      <strong id="greylist-count">{{ greylist|length }}</strong>
+      <small>активних IP-адрес</small>
+    </article>
+    <article class="sentinel-stat sentinel-stat--blue">
+      <span class="sentinel-stat__label">Інциденти</span>
+      <strong id="incident-count">{{ stats.incidents_total }}</strong>
+      <small>у кільцевому журналі</small>
+    </article>
+  </section>
+
+  <nav class="sentinel-nav" aria-label="Розділи стенда">
+    <a href="#burst">Стрес-тест</a>
+    <a href="#waf-attack-panel">WAF-атаки</a>
+    <a href="#incidents">Журнал</a>
+    <a href="#rules">Правила</a>
+    <a href="#signatures">Сигнатури</a>
+  </nav>
+
+  <div class="sentinel-grid" id="burst">
+    <section class="panel sentinel-panel" id="rate-limit-panel">
+      <div class="panel__head">
+        <h2>Стрес-тест login</h2>
+        <span class="status-pill" id="burst-status" data-state="idle">очікує запуск</span>
+      </div>
+      <p class="sentinel-copy">
+        Скрипт надсилає <strong>10 POST-запитів</strong> на
+        <code>/api/v1/auth/login</code> з хибним паролем. Перші 5 мають
+        повернути <code>401</code>, наступні — <code>429</code> із
+        заголовком <code>Retry-After</code>.
+      </p>
+      <div class="sentinel-actions">
+        <button class="btn btn--primary" type="button" id="btn-burst">
+          {{ icon('terminal') }}<span>Надіслати 10 запитів</span>
+        </button>
+        <button class="btn btn--ghost btn--small" type="button" id="btn-refresh">
+          {{ icon('eye') }}<span>Оновити журнал</span>
+        </button>
+      </div>
+      <div class="table-wrap sentinel-table-wrap">
+        <table class="data-table" aria-label="Результати стрес-тесту">
+          <thead>
+            <tr><th>#</th><th>HTTP</th><th>Retry-After</th><th>Тіло відповіді</th></tr>
+          </thead>
+          <tbody id="burst-results">
+            <tr><td colspan="4" class="empty-cell">Натисніть «Надіслати 10 запитів».</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="api-note">
+        Ліміт діє на <code>POST /api/v1/auth/login</code> і
+        <code>POST /login</code> окремо від загального API-ліміту.
+      </p>
+    </section>
+
+    <section class="panel sentinel-panel" id="waf-attack-panel">
+      <div class="panel__head">
+        <h2>WAF-атаки</h2>
+        <span class="status-pill" id="waf-status" data-state="idle">очікує payload</span>
+      </div>
+      <p class="sentinel-copy">
+        Кожна кнопка надсилає реальний запит із сигнатурою. Успішна атака
+        має отримати <code>403</code>, а IP — потрапити до Greylist.
+      </p>
+      <div class="attack-button-grid">
+        <button class="btn btn--secondary btn--small" type="button" data-attack="path">
+          {{ icon('alert') }}<span>Path Traversal</span>
+        </button>
+        <button class="btn btn--secondary btn--small" type="button" data-attack="sqli">
+          {{ icon('db') }}<span>SQL Injection</span>
+        </button>
+        <button class="btn btn--secondary btn--small" type="button" data-attack="cmd">
+          {{ icon('terminal') }}<span>Command Injection</span>
+        </button>
+        <button class="btn btn--secondary btn--small" type="button" data-attack="xss">
+          {{ icon('shield') }}<span>XSS Signature</span>
+        </button>
+      </div>
+      <div class="attack-result" id="waf-result" data-state="idle">
+        <span class="attack-result__label">Останній запит</span>
+        <pre class="code-block code-block--console">Ще не надсилали payload.</pre>
+      </div>
+      <div class="sentinel-actions sentinel-actions--split">
+        <button class="btn btn--ghost btn--small" type="button" id="btn-check-greylist">
+          {{ icon('lock') }}<span>Перевірити Greylist</span>
+        </button>
+        {% if allow_reset %}
+          <form method="post" action="{{ url_for('network.reset') }}" id="reset-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn--ghost btn--small" type="submit" id="btn-reset">
+              {{ icon('arrow') }}<span>Reset стенда</span>
+            </button>
+          </form>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  <div class="sentinel-grid" id="incidents">
+    <section class="panel sentinel-panel sentinel-panel--wide">
+      <div class="panel__head">
+        <h2>Журнал інцидентів</h2>
+        <span class="badge badge--bad" id="incident-badge">{{ stats.incidents_total }} подій</span>
+      </div>
+      <div class="table-wrap sentinel-table-wrap">
+        <table class="data-table incident-table" aria-label="Журнал інцидентів">
+          <thead>
+            <tr>
+              <th>Час</th><th>Тип</th><th>IP</th><th>Запит</th>
+              <th>Деталі</th><th>Дія</th><th>HTTP</th>
+            </tr>
+          </thead>
+          <tbody id="incident-body">
+            {% for item in incidents %}
+              <tr>
+                <td class="mono">{{ item.timestamp[11:19] }}</td>
+                <td><span class="incident-kind incident-kind--{{ item.kind }}">{{ item.kind }}</span></td>
+                <td class="mono">{{ item.ip }}</td>
+                <td class="mono incident-path">{{ item.method }} {{ item.path }}</td>
+                <td class="incident-detail">{{ item.detail }}</td>
+                <td class="incident-action">{{ item.action }}</td>
+                <td><span class="http-code http-code--{{ item.status_code }}">{{ item.status_code }}</span></td>
+              </tr>
+            {% else %}
+              <tr><td colspan="7" class="empty-cell">Журнал порожній. Запустіть стрес-тест або WAF-атаку.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="api-note">
+        Кільцевий журнал зберігає до {{ config.SECURITY_LOG_CAPACITY }} подій.
+        Кожен запис дублюється у <code>app.logger.warning</code>.
+      </p>
+    </section>
+
+    <section class="panel sentinel-panel" id="greylist">
+      <div class="panel__head">
+        <h2>Активний Greylist</h2>
+        <span class="badge">{{ greylist|length }} IP</span>
+      </div>
+      <div class="greylist-list" id="greylist-body">
+        {% for item in greylist %}
+          <article class="greylist-item">
+            <div>
+              <strong class="mono">{{ item.ip }}</strong>
+              <span>{{ item.reason }} · {{ item.rule_id }}</span>
+            </div>
+            <span class="greylist-timer mono">{{ item.remaining_seconds }} с</span>
+          </article>
+        {% else %}
+          <p class="empty-state empty-state--inline">Активних блокувань немає.</p>
+        {% endfor %}
+      </div>
+      <p class="api-note">
+        Greylist спрацьовує після першої сигнатури WAF. Повторні запити з
+        цієї IP отримують <code>403</code> до завершення інтервалу.
+      </p>
+    </section>
+  </div>
+
+  <section class="panel sentinel-panel" id="rules">
+    <div class="panel__head">
+      <h2>Правила Rate Limiting</h2>
+      <span class="badge badge--ok">Sliding Window Log</span>
+    </div>
+    <div class="rule-grid">
+      {% for rule in rules %}
+        <article class="rule-card">
+          <div class="rule-card__head">
+            <span class="mono">{{ rule.name }}</span>
+            <strong>{{ rule.limit }} / {{ rule.window_seconds }} с</strong>
+          </div>
+          <h3>{{ rule.title }}</h3>
+          <p class="mono">{{ rule.scope }}</p>
+          <div class="rule-meter" aria-hidden="true">
+            {% for _ in range(rule.limit if rule.limit <= 12 else 12) %}
+              <span></span>
+            {% endfor %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+    <p class="api-note">
+      Ковзне вікно зберігає мітки часу в <code>deque</code>; пам'ять на ключ
+      обмежена лімітом. Застарілі ключі прибираються після
+      <code>RATE_LIMIT_KEY_TTL_SECONDS</code>.
+    </p>
+  </section>
+
+  <section class="panel sentinel-panel" id="signatures">
+    <div class="panel__head">
+      <h2>Сигнатури WAF</h2>
+      <span class="badge">{{ signatures|length }} правил</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>ID</th><th>Клас атаки</th><th>Рівень</th><th>Приклад</th></tr>
+        </thead>
+        <tbody>
+          {% for signature in signatures %}
+            <tr>
+              <td class="mono">{{ signature.rule_id }}</td>
+              <td>{{ signature.title }}</td>
+              <td><span class="severity severity--{{ signature.severity }}">{{ signature.severity }}</span></td>
+              <td class="mono table-value">{{ signature.example }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="api-note">
+      WAF інспектує path, query string і тіло (до
+      <code>WAF_MAX_BODY_INSPECT</code> байт). Лабораторні сторінки
+      <code>/client-lab</code> і <code>/security-lab</code> навмисно
+      виключені, щоб демонструвати санітизацію та параметризовані запити.
+    </p>
+  </section>
+
+  <section class="sentinel-flow">
+    <article>
+      <span class="icon-tile">{{ icon('shield') }}</span>
+      <h3>1. Greylist</h3>
+      <p>IP після сигнатури блокується на {{ greylist_seconds }} с.</p>
+    </article>
+    <span class="flow-arrow" aria-hidden="true">→</span>
+    <article>
+      <span class="icon-tile">{{ icon('alert') }}</span>
+      <h3>2. WAF</h3>
+      <p>Path / query / body звіряються з {{ signatures|length }} сигнатурами.</p>
+    </article>
+    <span class="flow-arrow" aria-hidden="true">→</span>
+    <article>
+      <span class="icon-tile">{{ icon('terminal') }}</span>
+      <h3>3. Rate Limiter</h3>
+      <p>Login 5/хв, API 60/хв, HTML 120/хв на одну IP.</p>
+    </article>
+    <span class="flow-arrow" aria-hidden="true">→</span>
+    <article>
+      <span class="icon-tile">{{ icon('check') }}</span>
+      <h3>4. Flask route</h3>
+      <p>Лише після трьох перевірок запит потрапляє до бізнес-логіки.</p>
+    </article>
+  </section>
+</main>
+
+<script src="{{ url_for('static', filename='js/waf_lab.js') }}" defer></script>
+{% endblock %}

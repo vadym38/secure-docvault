@@ -390,6 +390,8 @@ def main() -> None:
             # Для скриншота Secure-cookie браузер вважає 127.0.0.1 trustworthy.
             "SESSION_COOKIE_SECURE": True,
             "SESSION_COOKIE_SAMESITE": "Strict",
+            "WAF_ENABLED": False,
+            "RATE_LIMIT_ENABLED": False,
         },
     )
     app = create_app(test_config)

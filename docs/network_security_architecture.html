@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Secure DocVault · Sentinel Gate (ЛР №4)</title>
+<style>
+  :root {
+    --bg: #05080b;
+    --panel: #0c141b;
+    --panel-2: #101b24;
+    --line: rgba(151, 193, 208, 0.16);
+    --line-strong: rgba(151, 193, 208, 0.3);
+    --text: #e9f3f3;
+    --muted: #8aa1a9;
+    --muted-2: #647a83;
+    --mint: #72f2c6;
+    --blue: #7ab8ff;
+    --amber: #ffb86b;
+    --rose: #ff7c91;
+    --mono: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+    --display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; padding: 42px 48px 54px;
+    color: var(--text); font-family: var(--display);
+    background:
+      radial-gradient(900px 520px at 84% -8%, rgba(255, 184, 107, 0.14), transparent 62%),
+      radial-gradient(760px 460px at 2% 11%, rgba(255, 124, 145, 0.08), transparent 58%),
+      var(--bg);
+  }
+  header { max-width: 1340px; margin: 0 auto 28px; }
+  .eyebrow {
+    display: flex; align-items: center; gap: 9px; margin: 0 0 12px;
+    color: var(--amber); font-family: var(--mono); font-size: 12px;
+    letter-spacing: 0.16em; text-transform: uppercase;
+  }
+  .pulse {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--amber);
+    box-shadow: 0 0 0 5px rgba(255, 184, 107, 0.14);
+  }
+  h1 { margin: 0; max-width: 1040px; font-size: 46px; line-height: 1.02; letter-spacing: -0.045em; }
+  .grad {
+    background: linear-gradient(100deg, var(--amber), #ffd6a3 45%, var(--rose));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .lede { max-width: 1040px; margin: 16px 0 0; color: #c3d4d8; font-size: 15px; line-height: 1.6; }
+
+  .pipeline {
+    display: grid; grid-template-columns: 1fr 34px 1fr 34px 1fr 34px 1fr 34px 1fr 34px 1fr;
+    align-items: stretch; max-width: 1340px; margin: 0 auto 24px;
+  }
+  .gate {
+    position: relative; padding: 20px 17px 18px;
+    border: 1px solid var(--line); border-radius: 16px;
+    background: linear-gradient(160deg, rgba(255,255,255,0.045), rgba(255,255,255,0.008));
+  }
+  .gate__num {
+    position: absolute; top: -12px; left: 15px; padding: 3px 9px;
+    border-radius: 999px; color: #1a0d02; background: linear-gradient(135deg, var(--amber), #ffd6a3);
+    font-family: var(--mono); font-size: 10px; font-weight: 700;
+  }
+  .gate h2 { margin: 6px 0 8px; font-size: 16px; letter-spacing: -0.02em; }
+  .gate p { margin: 0; color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+  .gate code { color: var(--amber); font-family: var(--mono); font-size: 10.8px; white-space: nowrap; }
+  .gate--req { border-color: rgba(122, 184, 255, 0.3); }
+  .gate--ip { border-color: rgba(114, 242, 198, 0.3); }
+  .gate--grey { border-color: rgba(255, 124, 145, 0.34); }
+  .gate--waf { border-color: rgba(255, 184, 107, 0.38); }
+  .gate--rate { border-color: rgba(255, 184, 107, 0.3); }
+  .gate--route { border-color: rgba(114, 242, 198, 0.3); }
+  .gate--grey h2 { color: var(--rose); }
+  .gate--waf h2 { color: var(--amber); }
+  .arrow { display: grid; place-items: center; color: var(--muted-2); font-size: 18px; }
+
+  .grid {
+    display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 18px;
+    max-width: 1340px; margin: 0 auto 20px;
+  }
+  .panel {
+    padding: 21px; border: 1px solid var(--line); border-radius: 17px;
+    background: linear-gradient(160deg, rgba(255,255,255,0.035), rgba(255,255,255,0.008));
+  }
+  .panel h2 { margin: 0 0 13px; font-size: 16px; }
+  .rule-row { display: grid; grid-template-columns: 1.1fr 0.65fr 1.25fr; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); align-items: center; }
+  .rule-row:first-of-type { border-top: 0; }
+  .rule-row strong { font-size: 12px; }
+  .rule-row code { color: var(--amber); font-family: var(--mono); font-size: 11px; }
+  .rule-row span { color: var(--muted); font-size: 11px; }
+  .pill { display: inline-flex; padding: 3px 8px; border-radius: 999px; font-family: var(--mono); font-size: 10px; }
+  .pill--rose { color: var(--rose); background: rgba(255,124,145,0.1); border: 1px solid rgba(255,124,145,0.3); }
+  .pill--amber { color: var(--amber); background: rgba(255,184,107,0.1); border: 1px solid rgba(255,184,107,0.3); }
+
+  .window { margin-top: 4px; }
+  .timeline {
+    position: relative; height: 92px; margin: 22px 0 40px;
+    border-bottom: 2px solid var(--line-strong);
+  }
+  .tick {
+    position: absolute; bottom: -24px; transform: translateX(-50%);
+    color: var(--muted-2); font-family: var(--mono); font-size: 9.5px;
+  }
+  .bar {
+    position: absolute; bottom: 4px; width: 9px; border-radius: 5px 5px 0 0;
+    background: linear-gradient(180deg, var(--rose), rgba(255,124,145,0.35));
+  }
+  .bar--new { background: linear-gradient(180deg, var(--amber), rgba(255,184,107,0.35)); }
+  .drop {
+    position: absolute; top: -4px; bottom: 0; width: 2px;
+    background: repeating-linear-gradient(180deg, var(--mint) 0 5px, transparent 5px 10px);
+  }
+  .window-note { color: var(--muted); font-size: 11.5px; line-height: 1.55; }
+  .window-note code { color: var(--mint); font-family: var(--mono); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  th, td { padding: 8px 9px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { color: var(--muted); font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; }
+  td { color: #c3d4d8; line-height: 1.45; }
+  tr:last-child td { border-bottom: 0; }
+  td code { color: var(--amber); font-family: var(--mono); font-size: 10.5px; }
+
+  .responses { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .response {
+    padding: 15px; border-radius: 12px; border: 1px solid var(--line);
+    background: rgba(4,8,11,0.36);
+  }
+  .response h3 { margin: 0 0 6px; font-size: 13px; }
+  .response--403 { border-color: rgba(255,124,145,0.3); }
+  .response--429 { border-color: rgba(255,184,107,0.3); }
+  .response p { margin: 0; color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+  .response code { color: var(--text-soft); font-family: var(--mono); font-size: 10.8px; }
+
+  .footer {
+    max-width: 1340px; margin: 0 auto; padding: 18px 22px;
+    border: 1px solid rgba(255,184,107,0.24); border-radius: 17px;
+    background: rgba(255,184,107,0.055);
+    color: #c3d4d8; font-size: 12.5px; line-height: 1.55;
+  }
+  .footer strong { color: var(--amber); }
+</style>
+</head>
+<body>
+  <header>
+    <p class="eyebrow"><span class="pulse"></span> Sentinel gate / application layer</p>
+    <h1>Кожен запит — <span class="grad">чотири перевірки до Flask.</span></h1>
+    <p class="lede">
+      Greylist відсікає вже відомі атаки, WAF шукає сигнатури в path/query/body,
+      Rate Limiter рахує ковзне вікно за IP, і лише після цього запит потрапляє
+      до бізнес-логіки. Відповідь 403 або 429 формується до виконання маршруту.
+    </p>
+  </header>
+
+  <section class="pipeline" aria-label="Конвеєр перевірок">
+    <article class="gate gate--req"><span class="gate__num">01</span><h2>HTTP request</h2><p>Метод, path, query, body, IP клієнта.</p></article>
+    <div class="arrow">→</div>
+    <article class="gate gate--ip"><span class="gate__num">02</span><h2>IP resolver</h2><p><code>request.remote_addr</code>; <code>X-Forwarded-For</code> — лише за trusted proxy.</p></article>
+    <div class="arrow">→</div>
+    <article class="gate gate--grey"><span class="gate__num">03</span><h2>Greylist</h2><p>IP після сигнатури блокується на <code>300 с</code>. Повторні запити → 403.</p></article>
+    <div class="arrow">→</div>
+    <article class="gate gate--waf"><span class="gate__num">04</span><h2>WAF</h2><p>13 сигнатур: traversal, SQLi, command injection, XSS.</p></article>
+    <div class="arrow">→</div>
+    <article class="gate gate--rate"><span class="gate__num">05</span><h2>Rate Limiter</h2><p>Sliding Window Log: login, API, HTML — окремі ліміти.</p></article>
+    <div class="arrow">→</div>
+    <article class="gate gate--route"><span class="gate__num">06</span><h2>Flask route</h2><p>Бізнес-логіка бачить лише дозволений запит.</p></article>
+  </section>
+
+  <section class="grid">
+    <div class="panel">
+      <h2>Диференційовані ліміти</h2>
+      <div class="rule-row"><strong>Вхід / автентифікація</strong><code>5 / 60 с</code><span><code>POST /api/v1/auth/login</code>, <code>POST /login</code></span></div>
+      <div class="rule-row"><strong>Загальні API</strong><code>60 / 60 с</code><span><code>/api/v1/*</code></span></div>
+      <div class="rule-row"><strong>HTML-сторінки</strong><code>120 / 60 с</code><span>решта маршрутів порталу</span></div>
+      <div class="rule-row"><strong>Ключ</strong><code>IP + rule</code><span>окремі <code>deque</code> для кожного правила</span></div>
+      <p class="window-note" style="margin-top:12px">
+        Перевищення → <span class="pill pill--amber">429</span> +
+        <code>Retry-After</code>; подія пишеться в журнал інцидентів.
+      </p>
+    </div>
+
+    <div class="panel">
+      <h2>Відповіді до маршруту</h2>
+      <div class="responses">
+        <article class="response response--403">
+          <h3>403 Forbidden</h3>
+          <p><code>waf_blocked</code> або <code>ip_greylisted</code>. IP додається до Greylist; наступні запити блокуються тим самим інтервалом.</p>
+        </article>
+        <article class="response response--429">
+          <h3>429 Too Many Requests</h3>
+          <p><code>rate_limited</code> + <code>Retry-After: N</code>. Клієнт знає, коли безпечно повторити запит.</p>
+        </article>
+      </div>
+      <p class="window-note" style="margin-top:12px">
+        HTML-клієнт отримує стилізовану сторінку, API — JSON із
+        <code>error.code</code>, <code>rule</code> та <code>retry_after</code>.
+      </p>
+    </div>
+  </section>
+
+  <section class="panel" style="max-width:1340px;margin:0 auto 20px">
+    <h2>Sliding Window Log: чому не Fixed Window</h2>
+    <div class="window">
+      <div class="timeline" aria-hidden="true">
+        <span class="bar" style="left:12%;height:38px"></span>
+        <span class="bar" style="left:24%;height:56px"></span>
+        <span class="bar" style="left:36%;height:30px"></span>
+        <span class="bar" style="left:48%;height:72px"></span>
+        <span class="bar" style="left:61%;height:44px"></span>
+        <span class="bar bar--new" style="left:74%;height:64px"></span>
+        <span class="drop" style="left:12%"></span>
+        <span class="tick" style="left:12%">t₀</span>
+        <span class="tick" style="left:48%">t₀+30 с</span>
+        <span class="tick" style="left:74%">now</span>
+        <span class="tick" style="left:94%">t₀+60 с</span>
+      </div>
+      <p class="window-note">
+        Кожен запит — мітка часу в <code>deque</code>. На кожному кроці
+        відкидаються мітки старші за <code>window_seconds</code>. Немає
+        «скидання» на межі хвилини, тому немає подвійного сплеску
+        <code>2 × limit</code>, характерного для Fixed Window. Пам'ять на
+        ключ обмежена самим лімітом; застарілі ключі прибираються за
+        <code>RATE_LIMIT_KEY_TTL_SECONDS</code>, а <code>max_keys</code>
+        захищає від Memory Exhaustion DoS.
+      </p>
+    </div>
+  </section>
+
+  <section class="panel" style="max-width:1340px;margin:0 auto 20px">
+    <h2>Сигнатури WAF</h2>
+    <table>
+      <thead><tr><th>ID</th><th>Клас</th><th>Приклад</th><th>Дія</th></tr></thead>
+      <tbody>
+        <tr><td><code>waf-1001</code></td><td>Path Traversal</td><td><code>../../etc/passwd</code></td><td><span class="pill pill--rose">403 + Greylist</span></td></tr>
+        <tr><td><code>waf-1002</code></td><td>SQL Injection: UNION SELECT</td><td><code>' UNION SELECT ...</code></td><td><span class="pill pill--rose">403 + Greylist</span></td></tr>
+        <tr><td><code>waf-1003</code></td><td>SQL Injection: tautology</td><td><code>' OR '1'='1</code></td><td><span class="pill pill--rose">403 + Greylist</span></td></tr>
+        <tr><td><code>waf-2001</code></td><td>Command Injection</td><td><code>; /bin/sh -c id</code></td><td><span class="pill pill--rose">403 + Greylist</span></td></tr>
+        <tr><td><code>waf-2003</code></td><td>system()/exec()</td><td><code>system('id')</code></td><td><span class="pill pill--rose">403 + Greylist</span></td></tr>
+        <tr><td><code>waf-3001</code></td><td>XSS: script tag</td><td><code>&lt;script&gt;alert(1)&lt;/script&gt;</code></td><td><span class="pill pill--rose">403 + Greylist</span></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <div class="footer">
+    <strong>Defense in Depth:</strong> WAF і Rate Limiter — активний периметр,
+    але не заміна безпечному коду. Параметризовані SQL-запити, Jinja2
+    autoescape, Bleach-санітизація та CSP із ЛР №1–3 залишаються другими
+    рівнями. Сигнатурний WAF має False Positives, тому виключення для
+    лабораторних сторінок і журнал інцидентів дозволяють контрольовано
+    налагоджувати правила.
+  </div>
+</body>
+</html>

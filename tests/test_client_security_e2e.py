@@ -40,6 +40,8 @@ class ClientSecurityE2ETests(unittest.TestCase):
             (Config,),
             {
                 "TESTING": True,
+                "WAF_ENABLED": False,
+                "RATE_LIMIT_ENABLED": False,
                 "SECRET_KEY": "lab3-e2e-secret-key",
                 "JWT_SECRET_KEY": "lab3-e2e-jwt-key-0123456789abcdef0123456789abcdef",
                 "DATABASE": str(cls.db_path),

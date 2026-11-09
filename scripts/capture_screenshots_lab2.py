@@ -39,6 +39,7 @@ from werkzeug.serving import make_server  # noqa: E402
 
 from app import create_app  # noqa: E402
 from app.auth_security import hash_password  # noqa: E402
+from app.config import Config  # noqa: E402
 from app.database import create_user, find_user_by_username  # noqa: E402
 
 try:
@@ -85,7 +86,13 @@ def main() -> int:
     SCREENSHOTS.mkdir(parents=True, exist_ok=True)
     _remove_demo_db()
 
-    app = create_app()
+    app = create_app(
+        type(
+            "Lab2CaptureConfig",
+            (Config,),
+            {"WAF_ENABLED": False, "RATE_LIMIT_ENABLED": False},
+        )
+    )
     _seed_users(app)
 
     server = make_server("127.0.0.1", 0, app, threaded=True)

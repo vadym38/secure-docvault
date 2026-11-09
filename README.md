@@ -1,9 +1,9 @@
-# Secure DocVault — етап 3: клієнтський захист і конфігурація вебсервера
+# Secure DocVault — етап 4: WAF, Rate Limiting і мережевий захист
 
-Навчальний проєкт до лабораторних робіт №1–3 з дисципліни
+Навчальний проєкт до лабораторних робіт №1–4 з дисципліни
 **«Технології захисту інформаційних ресурсів»**.
 
-Реалізовано три шари захисту корпоративного порталу **Secure DocVault**:
+Реалізовано чотири шари захисту корпоративного порталу **Secure DocVault**:
 
 1. **ЛР №1 — автентифікація та захист БД:** реєстрація, вхід, безпечне
    зберігання паролів у SQLite, захист від SQL-ін'єкцій, CSRF і session
@@ -16,20 +16,41 @@
    контекстне екранування виводу, CSP без `unsafe-inline`, безпечні
    cookie (`HttpOnly`, `Secure`, `SameSite=Strict`), HSTS, `nosniff`,
    `X-Frame-Options: DENY` та CORS із явним whitelist Origin.
+4. **ЛР №4 — мережевий захист рівня застосунку:** сигнатурний WAF,
+   Greylist для IP, Sliding Window Rate Limiting із диференційованими
+   лімітами для login/API/HTML, коректні `403`/`429` та журнал інцидентів.
 
 Замість десктопного PyQt-інтерфейсу з прикладу зроблено **веб-інтерфейс
 на Flask + Jinja2** з авторським темним дизайном «Obsidian Vault»,
-інтерактивною JWT-лабораторією `/api-lab` та стендом клієнтського
-захисту `/client-lab`.
+інтерактивними стендами `/api-lab`, `/client-lab` і `/waf-lab`.
 
 > **Статус:** виконано ЛР №1 (тег `v0.1-auth-db`), ЛР №2
-> (тег `v0.2-jwt-api`) і ЛР №3 (тег `v0.3-client-security`). WAF,
-> шифрування файлів та цифрові підписи з наступних етапів навмисно не
-> додані.
+> (тег `v0.2-jwt-api`), ЛР №3 (тег `v0.3-client-security`) і ЛР №4
+> (тег `v0.4-waf-ratelimit`). Шифрування файлів та цифрові підписи з
+> наступних етапів навмисно не додані.
 
 ---
 
 ## 1. Що демонструє проєкт
+
+### ЛР №4 — WAF і Rate Limiting
+
+| Вимога ЛР | Реалізація |
+|---|---|
+| Sliding Window Rate Limiter | `app/rate_limiter.py`: `deque` міток часу, потокобезпечний `check()` |
+| Ліміт login 5/хв | `POST /api/v1/auth/login`, `POST /login` → `auth_login` |
+| Загальний API 60/хв | `/api/v1/*` → `api_general` |
+| HTML-сторінки | 120/хв → `web_general` |
+| `429 Too Many Requests` | JSON/HTML + `Retry-After`, `X-RateLimit-*` |
+| Журнал інцидентів | `app/security_events.py` + `app.logger.warning` + `/waf-lab` |
+| Path Traversal | сигнатура `waf-1001` + `403` + Greylist |
+| SQL-ін'єкції | `waf-1002`/`1003`/`1004`/`1005` (`UNION SELECT`, tautology, DROP, `xp_cmdshell`) |
+| Командні ін'єкції | `waf-2001`…`2004` (`; /bin/sh`, `cmd.exe`, `system(`, `cmd=`) |
+| XSS-сигнатури | `waf-3001`…`3004` |
+| Блокування IP (Greylist) | `app/waf_filter.py`: `Greylist`, `WAF_GREYLIST_SECONDS` |
+| Стрес-тест | `scripts/stress_test_lab4.py` (10 запитів, stdlib `urllib`) |
+| Тести | 66 нових: 9 unit Rate Limiter, 33 unit WAF, 18 інтеграційних, 6 Selenium E2E |
+| Звіт | `docs/screenshots 4/`, `docs/network_security_architecture.html` |
 
 ### ЛР №3 — клієнтський захист і безпечний вебсервер
 
@@ -90,10 +111,12 @@
 - **bcrypt 5.0** — хешування паролів, work factor 12
 - **HTML/CSS/vanilla JS** — адаптивний інтерфейс без зовнішніх CDN
 - **unittest + Selenium WebDriver** — тестування (Edge headless)
+- **stdlib `urllib`** — окремий стрес-скрипт ЛР №4 без зовнішніх залежностей
 
-> У проєкті **не використовуються** `pytest`, `fastapi.testclient.TestClient`,
-> `httpx`, `requests` або `urllib.request` для тестування. Тестовий стек
-> побудований на `unittest` і `selenium`, який працює з реальним браузером.
+> У тестах **не використовуються** `pytest`, `fastapi.testclient.TestClient`,
+> `httpx` або `requests`. Тестовий стек побудований на `unittest` і
+> `selenium`, який працює з реальним браузером. Стрес-скрипт ЛР №4
+> навмисно використовує лише стандартну бібліотеку `urllib`.
 
 ---
 
@@ -109,8 +132,13 @@ secure-docvault/
 │   ├── client_security.py       # ЛР №3: стенд /client-lab (XSS, CSP, cookies, CORS)
 │   ├── sanitizer.py             # ЛР №3: Bleach-санітизація та звіт про вектори
 │   ├── security.py              # ЛР №3: CSP, HSTS, nosniff, XFO, CORS-middleware
+│   ├── network_guard.py         # ЛР №4: before_request WAF + Rate Limiter + Greylist
+│   ├── network_lab.py           # ЛР №4: стенд /waf-lab, /events, /reset
+│   ├── rate_limiter.py          # ЛР №4: Sliding Window Log
+│   ├── security_events.py       # ЛР №4: кільцевий журнал інцидентів
+│   ├── waf_filter.py            # ЛР №4: сигнатури атак і Greylist
 │   ├── jwt_service.py           # випуск/декодування JWT, заборона alg:none
-│   ├── config.py                # конфігурація з .env (сесії, JWT, CORS)
+│   ├── config.py                # конфігурація з .env (сесії, JWT, CORS, WAF)
 │   ├── database.py              # users, refresh_tokens, client_notes
 │   ├── static/
 │   │   ├── css/app.css          # тема «Obsidian Vault»
@@ -118,7 +146,8 @@ secure-docvault/
 │   │   ├── js/api_lab.js        # fetch-протокол JWT, декодер, tamper, rotation
 │   │   ├── js/client_lab.js     # швидкі XSS-payload у формі санітизатора
 │   │   ├── js/client_lab_csp.js # securitypolicyviolation → консоль/таблиця
-│   │   └── js/client_lab_cookies.js # демонстрація document.cookie
+│   │   ├── js/client_lab_cookies.js # демонстрація document.cookie
+│   │   └── js/waf_lab.js        # стрес-тест, WAF-атаки, журнал, Reset
 │   └── templates/
 │       ├── _brand.html
 │       ├── _client_nav.html
@@ -129,6 +158,8 @@ secure-docvault/
 │       ├── client_lab_cookies.html
 │       ├── client_lab_headers.html
 │       ├── client_lab_cors.html
+│       ├── network_block.html   # стилізовані 403/429
+│       ├── waf_lab.html         # панель WAF / Rate Limiting
 │       ├── auth_base.html
 │       ├── base.html
 │       ├── dashboard.html
@@ -140,6 +171,8 @@ secure-docvault/
 │   ├── screenshots/             # 9 скриншотів ЛР №1
 │   ├── screenshots 2/           # 10 скриншотів ЛР №2
 │   ├── screenshots 3/           # скриншоти ЛР №3
+│   ├── screenshots 4/           # скриншоти ЛР №4
+│   ├── network_security_architecture.html # схема WAF / Rate Limiter
 │   ├── client_security_architecture.html # схема ешелонованого захисту
 │   ├── jwt_architecture.html    # схема обміну токенами
 │   ├── jwt_db_snapshot.html     # HTML-знімок refresh_tokens
@@ -149,6 +182,8 @@ secure-docvault/
 │   ├── capture_screenshots.py   # скриншоти ЛР №1
 │   ├── capture_screenshots_lab2.py  # скриншоти ЛР №2
 │   ├── capture_screenshots_lab3.py  # скриншоти ЛР №3
+│   ├── capture_screenshots_lab4.py  # скриншоти ЛР №4
+│   ├── stress_test_lab4.py      # стрес-тест 10 запитів + WAF
 │   ├── jwt_db_snapshot.py       # HTML-знімок refresh_tokens
 │   ├── db_snapshot.py           # HTML-знімок users
 │   └── seed_demo.py             # створення демо-користувача
@@ -161,7 +196,11 @@ secure-docvault/
 │   ├── test_api_web_e2e.py      # 1 E2E-тест JWT-стенда
 │   ├── test_sanitizer.py        # 22 юніт-тести ЛР №3
 │   ├── test_client_security.py  # 16 інтеграційних тестів ЛР №3
-│   └── test_client_security_e2e.py # 6 Selenium E2E-тестів ЛР №3
+│   ├── test_client_security_e2e.py # 6 Selenium E2E-тестів ЛР №3
+│   ├── test_rate_limiter.py     # 9 юніт-тестів Rate Limiter
+│   ├── test_waf_filter.py       # 33 юніт-тести WAF / Greylist
+│   ├── test_network_security.py # 18 інтеграційних тестів ЛР №4
+│   └── test_network_security_e2e.py # 6 Selenium E2E-тестів ЛР №4
 ├── .env.example
 ├── .gitignore
 ├── README.md
@@ -258,6 +297,14 @@ PORT=5000
 | GET | `/client-lab/cookies` | інспектор `HttpOnly` / `Secure` / `SameSite` |
 | GET | `/client-lab/headers` | матриця та фактичні заголовки відповіді |
 | GET | `/client-lab/cors` | дозволений, сторонній Origin і preflight |
+
+### Мережевий захист (ЛР №4)
+
+| Метод | Маршрут | Призначення |
+|---|---|---|
+| GET | `/waf-lab` | панель WAF, Rate Limiter, Greylist і журналу |
+| GET | `/waf-lab/events` | JSON для живого оновлення журналу |
+| POST | `/waf-lab/reset` | лабораторний скид стану (CSRF + config-прапорець) |
 
 ### REST API v1 (ЛР №2)
 
@@ -564,6 +611,92 @@ inline-обробники `on*` не виконуються. Сторінка `/
 - `Vary: Origin` додається завжди, щоб проміжні кеші не змішували
   відповіді для різних Origin.
 
+### 7.13. Sliding Window Rate Limiter (ЛР №4)
+
+`app/rate_limiter.py` зберігає для кожного ключа `IP:rule` `deque`
+міток часу в межах вікна:
+
+```python
+def check(self, client_ip, rule, *, now=None):
+    current = time.monotonic() if now is None else now
+    key = f"{client_ip}:{rule.name}"
+    with self._lock:
+        bucket = self._events[key]
+        cutoff = current - rule.window_seconds
+        while bucket and bucket[0] <= cutoff:
+            bucket.popleft()
+        if len(bucket) >= rule.limit:
+            oldest = bucket[0]
+            retry = max(1, math.ceil(rule.window_seconds - (current - oldest)))
+            return RateDecision(False, ..., retry_after=retry)
+        bucket.append(current)
+        return RateDecision(True, ..., remaining=rule.limit - len(bucket))
+```
+
+Правила:
+
+| Група | Ліміт | Маршрути |
+|---|---|---|
+| `auth_login` | 5 / 60 с | `POST /api/v1/auth/login`, `POST /login` |
+| `api_general` | 60 / 60 с | `/api/v1/*` |
+| `web_general` | 120 / 60 с | решта HTML-маршрутів |
+
+Переваги Sliding Window Log: немає подвійного сплеску `2 × limit` на межі
+хвилини; `Retry-After` обчислюється точно за найстарішою міткою. Пам'ять
+на ключ обмежена лімітом, а `RATE_LIMIT_MAX_KEYS` + `RATE_LIMIT_KEY_TTL_SECONDS`
+захищають від Memory Exhaustion DoS.
+
+### 7.14. Сигнатурний WAF і Greylist (ЛР №4)
+
+`app/waf_filter.py` перевіряє **path → query → body** після подвійного
+URL-декодування та NFKC-нормалізації. Сигнатури згруповані:
+
+- Path Traversal — `../`, `..\`, зокрема `%2e%2e%2f`;
+- SQL Injection — `UNION SELECT`, tautology `' OR '1'='1`, `DROP TABLE`,
+  `INSERT INTO`, `EXEC xp_`, `xp_cmdshell`;
+- Command Injection — `; /bin/sh`, `| bash`, `cmd.exe`, `system(`, `exec(`,
+  `?cmd=`;
+- XSS — `<script>`, `javascript:`, `onerror=`, `<svg>`.
+
+При спрацюванні:
+
+1. IP додається до `Greylist` на `WAF_GREYLIST_SECONDS` (за замовчуванням
+   300 с);
+2. повертається `403 Forbidden` із `X-WAF-Rule`, `X-WAF-Action`,
+   `Retry-After`;
+3. подія пишеться в `IncidentLog` і `app.logger.warning`;
+4. усі наступні запити з цієї IP блокуються до завершення інтервалу.
+
+Лабораторні сторінки `/client-lab` і `/security-lab` навмисно виключені
+з WAF, щоб демонструвати санітизацію та параметризовані запити; їхній
+захист забезпечують шари ЛР №1 і ЛР №3.
+
+### 7.15. Коректна HTTP-семантика 403/429 (ЛР №4)
+
+- `403 Forbidden` — WAF/Greylist; API отримує JSON `error.code` =
+  `waf_blocked` або `ip_greylisted`, HTML — стилізовану сторінку.
+- `429 Too Many Requests` — перевищення ліміту; заголовок `Retry-After`
+  повідомляє, через скільки секунд можна повторити запит.
+- Успішні відповіді містять `X-RateLimit-Limit`, `X-RateLimit-Remaining`,
+  `X-RateLimit-Window`, `X-RateLimit-Rule`.
+- Журнал інцидентів доступний на `/waf-lab` і через `/waf-lab/events`.
+
+### 7.16. Лабораторний стенд `/waf-lab` (ЛР №4)
+
+Сторінка показує:
+
+- статус WAF, Rate Limiter, кількість активних Greylist-записів;
+- кнопку стрес-тесту (10 запитів → 401…429);
+- кнопки Path Traversal / SQLi / Command Injection / XSS;
+- журнал інцидентів із IP, маршрутом, деталями, дією та HTTP-кодом;
+- таблицю правил і сигнатур;
+- `Reset` для очищення лічильників, Greylist і журналу.
+
+`/waf-lab` і `/waf-lab/*` виключені з Greylist/лімітів, щоб консоль
+залишалася доступною під час демонстрації. У production цю консоль
+потрібно закрити авторизацією або вимкнути (`WAF_LAB_ALLOW_RESET=0`,
+окремий admin-маршрут).
+
 ---
 
 ## 8. Приклади запитів до API
@@ -650,7 +783,7 @@ python -m unittest discover -v
 **Результат на момент здачі:**
 
 ```text
-Ran 106 tests in 35.0s
+Ran 172 tests in 51.3s
 OK
 ```
 
@@ -665,6 +798,10 @@ OK
 | `test_sanitizer.py` | 22 | Bleach, небезпечні теги, шляхи, reserved names, звіт |
 | `test_client_security.py` | 16 | CSP, HSTS, XFO, CORS, cookie flags, CSRF, sanitize POST |
 | `test_client_security_e2e.py` | 6 | CSP-блокування в Edge, document.cookie, cookie flags, форма |
+| `test_rate_limiter.py` | 9 | Sliding Window, ліміти, Retry-After, ізоляція ключів, prune |
+| `test_waf_filter.py` | 33 | Path Traversal, SQLi, command injection, XSS, false positives, Greylist |
+| `test_network_security.py` | 18 | 401→429, 403, Greylist, журнал, CSRF Reset, виключення лабів |
+| `test_network_security_e2e.py` | 6 | реальний браузерний стрес-тест, WAF-атаки, Greylist, Reset |
 
 Окремі групи:
 
@@ -675,6 +812,9 @@ python -m unittest tests.test_jwt_service tests.test_api -v
 python -m unittest tests.test_api_web_e2e -v
 python -m unittest tests.test_sanitizer tests.test_client_security -v
 python -m unittest tests.test_client_security_e2e -v
+python -m unittest tests.test_rate_limiter tests.test_waf_filter -v
+python -m unittest tests.test_network_security -v
+python -m unittest tests.test_network_security_e2e -v
 ```
 
 ### Ручна перевірка JWT-протоколу
@@ -708,9 +848,54 @@ python -m unittest tests.test_client_security_e2e -v
 6. Відкрийте `/client-lab/cors` — дозволений Origin отримує
    `Access-Control-Allow-Origin`, сторонній — ні.
 
+### Ручна перевірка WAF / Rate Limiting
+
+1. Запустіть `python run.py` і відкрийте `/waf-lab`.
+2. Натисніть **«Надіслати 10 запитів»** — перші 5 відповідей `401`,
+   наступні 5 — `429` із `Retry-After`.
+3. Натисніть **Path Traversal** — відповідь `403`, `X-WAF-Rule: waf-1001`,
+   IP з'являється в Greylist.
+4. Натисніть **«Перевірити Greylist»** — `/api/v1/health` повертає `403`
+   `ip_greylisted` до завершення інтервалу.
+5. Відкрийте журнал інцидентів — там є IP, маршрут, деталі, дія та
+   HTTP-код.
+6. Натисніть **Reset** — лічильники, Greylist і журнал очищуються.
+7. Для термінального протоколу:
+   `python scripts/stress_test_lab4.py --base-url http://127.0.0.1:5000`.
+
 ---
 
 ## 10. Скриншоти та звіт
+
+### ЛР №4 — `docs/screenshots 4/`
+
+Автоматично згенерувати всі скриншоти:
+
+```bash
+python scripts/capture_screenshots_lab4.py
+```
+
+Скрипт піднімає сервер із увімкненими WAF/Rate Limiting, запускає
+`scripts/stress_test_lab4.py`, перехоплює реальні логи, проходить
+UI-сценарії в Edge headless і зберігає PNG.
+
+| Файл | Що демонструє |
+|---|---|
+| `00-waf-lab-overview.png` | оглядова сторінка `/waf-lab`: статуси, ліміти, кнопки |
+| `01-stress-test-429.png` | реальний стрес-тест: 5×401 → 5×429 + `Retry-After` |
+| `02-server-log-rate-limit.png` | журнал сервера: IP, `[RATE_LIMIT]`, `[WAF_BLOCK]`, `[GREYLIST]` |
+| `03-rate-limit-ui.png` | UI-таблиця 10 запитів: усі статуси та `Retry-After` |
+| `04-path-traversal-403.png` | Path Traversal → `403`, `waf-1001`, Greylist |
+| `05-sqli-403.png` | SQL Injection → `403`, `waf-1003` |
+| `06-command-injection-403.png` | Command Injection → `403`, `waf-2001` |
+| `07-greylist-block.png` | повторний запит → `403 ip_greylisted` |
+| `08-incident-log.png` | журнал інцидентів + активний Greylist |
+| `09-rate-limit-rules.png` | правила `auth_login` / `api_general` / `web_general` |
+| `10-waf-signatures.png` | 13 сигнатур WAF із прикладами |
+| `11-sentinel-architecture.png` | схема конвеєра WAF / Rate Limiter |
+
+Додатковий матеріал: `docs/network_security_architecture.html` — схема
+Sliding Window, сигнатур і HTTP-відповідей.
 
 ### ЛР №3 — `docs/screenshots 3/`
 
@@ -803,6 +988,7 @@ git tag
 # v0.1-auth-db
 # v0.2-jwt-api
 # v0.3-client-security
+# v0.4-waf-ratelimit
 ```
 
 Перевірити історію:
@@ -835,6 +1021,12 @@ python scripts/jwt_db_snapshot.py --db instance/lab2_demo.db
 # скриншоти ЛР №3
 python scripts/capture_screenshots_lab3.py
 
+# скриншоти ЛР №4
+python scripts/capture_screenshots_lab4.py
+
+# стрес-тест WAF / Rate Limiting (10 запитів)
+python scripts/stress_test_lab4.py --base-url http://127.0.0.1:5000
+
 # перевірити health-check
 http://127.0.0.1:5000/healthz
 http://127.0.0.1:5000/api/v1/health
@@ -847,7 +1039,12 @@ http://127.0.0.1:5000/api/v1/health
 
 ## 13. Обмеження поточного етапу
 
-- немає rate limiting / WAF — ЛР №4;
+- WAF і Rate Limiter — навчальні, не замінюють ModSecurity/CRS і
+  розподілений Redis-лічильник; сигнатурний аналіз має False Positives;
+- `/waf-lab` є відкритою лабораторною консоллю; у production її треба
+  закрити авторизацією або вимкнути (`WAF_LAB_ALLOW_RESET=0`);
+- WAF навмисно виключає `/client-lab` і `/security-lab`, щоб зберегти
+  демонстрації ЛР №1 та ЛР №3;
 - немає шифрування файлів — ЛР №5;
 - немає цифрових підписів — ЛР №6;
 - JWT зберігаються на клієнті в пам'яті стенда; у production-фронтенді
@@ -878,6 +1075,27 @@ Clickjacking і несанкціоноване міжсайтове читанн
 
 ---
 
-## 15. Ліцензія
+## 15. Висновок до ЛР №4
+
+Активний мережевий периметр Secure DocVault побудовано як конвеєр
+«IP → Greylist → WAF → Rate Limiter → Flask route»: сигнатурний фільтр
+`app/waf_filter.py` блокує Path Traversal, SQLi, командні ін'єкції та XSS
+ще до виконання маршруту, додає IP до Greylist і повертає коректний
+`403` із `X-WAF-Rule` та `Retry-After`, а `app/rate_limiter.py` реалізує
+Sliding Window Log із диференційованими лімітами 5/60 с для login,
+60/60 с для API і 120/60 с для HTML, повертаючи `429` із `Retry-After`
+та `X-RateLimit-*`. Кільцевий журнал інцидентів і сторінка `/waf-lab`
+дають змогу побачити IP, маршрут, сигнатуру, дію та статус, а
+лабораторний Reset дозволяє повторювати сценарії. Тести (9 unit Rate
+Limiter, 33 unit WAF, 18 інтеграційних і 6 Selenium E2E) підтверджують
+перехід `401 → 429`, блокування Path Traversal/SQLi/Command Injection,
+роботу Greylist і коректну сумісність із ЛР №1–3; при цьому WAF
+залишається додатковим шаром, а не заміною параметризованих запитів,
+санітизації та CSP, і потребує налаштування правил для зменшення
+False Positives.
+
+---
+
+## 16. Ліцензія
 
 Навчальний проєкт. Використовуйте лише для освітніх цілей.

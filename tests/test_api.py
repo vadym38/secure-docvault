@@ -40,6 +40,8 @@ class ApiTests(unittest.TestCase):
             (Config,),
             {
                 "TESTING": True,
+                "WAF_ENABLED": False,
+                "RATE_LIMIT_ENABLED": False,
                 "SECRET_KEY": "api-session-secret",
                 "JWT_SECRET_KEY": JWT_SECRET,
                 "DATABASE": str(cls.temp_dir / "api.db"),

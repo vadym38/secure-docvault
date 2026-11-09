@@ -1,4 +1,4 @@
-"""Application factory для Secure DocVault (етап 3)."""
+"""Application factory для Secure DocVault (етап 4)."""
 
 from __future__ import annotations
 
@@ -10,6 +10,8 @@ from .client_security import client_bp
 from .config import Config
 from .database import init_app as init_database
 from .jwt_service import MIN_SECRET_BYTES
+from .network_guard import install_network_middleware
+from .network_lab import network_bp
 from .security import install_security_middleware
 
 
@@ -45,7 +47,9 @@ def create_app(config_object: type = Config) -> Flask:
     app.register_blueprint(auth_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(client_bp)
+    app.register_blueprint(network_bp)
 
+    install_network_middleware(app)
     install_security_middleware(app)
 
     @app.errorhandler(400)

@@ -1,9 +1,10 @@
-"""Конфігурація застосунку Secure DocVault (етап 3).
+"""Конфігурація застосунку Secure DocVault (етап 4).
 
 Усі секрети та шляхи читаються зі змінних оточення. Для локального запуску
 використовуйте файл .env (див. .env.example). У виробничому середовищі
 обов'язково задайте власні SECRET_KEY і JWT_SECRET_KEY, увімкніть
-SESSION_COOKIE_SECURE та обмежте CORS_ALLOWED_ORIGINS.
+SESSION_COOKIE_SECURE, обмежте CORS_ALLOWED_ORIGINS та налаштуйте
+WAF/rate limiting під реальний профіль трафіку.
 """
 
 from __future__ import annotations
@@ -58,6 +59,43 @@ class Config:
 
     # Обмеження розміру запиту: форми автентифікації не потребують великих тіл.
     MAX_CONTENT_LENGTH = 1 * 1024 * 1024
+
+    # ------------------------------------------------------------------
+    # WAF та Rate Limiting (ЛР №4)
+    # ------------------------------------------------------------------
+
+    # Головні вимикачі. У тестах вони вимикаються, щоб не впливати на
+    # сценарії ЛР №1–3; Lab 4-тести вмикають їх явно.
+    WAF_ENABLED = os.environ.get("WAF_ENABLED", "1") == "1"
+    RATE_LIMIT_ENABLED = os.environ.get("RATE_LIMIT_ENABLED", "1") == "1"
+
+    # Диференційовані ліміти (Sliding Window Log).
+    RATE_LIMIT_LOGIN_LIMIT = int(os.environ.get("RATE_LIMIT_LOGIN_LIMIT", "5"))
+    RATE_LIMIT_LOGIN_WINDOW = int(os.environ.get("RATE_LIMIT_LOGIN_WINDOW", "60"))
+    RATE_LIMIT_API_LIMIT = int(os.environ.get("RATE_LIMIT_API_LIMIT", "60"))
+    RATE_LIMIT_API_WINDOW = int(os.environ.get("RATE_LIMIT_API_WINDOW", "60"))
+    RATE_LIMIT_WEB_LIMIT = int(os.environ.get("RATE_LIMIT_WEB_LIMIT", "120"))
+    RATE_LIMIT_WEB_WINDOW = int(os.environ.get("RATE_LIMIT_WEB_WINDOW", "60"))
+
+    # Захист пам'яті лічильників від Memory Exhaustion DoS.
+    RATE_LIMIT_MAX_KEYS = int(os.environ.get("RATE_LIMIT_MAX_KEYS", "10000"))
+    RATE_LIMIT_KEY_TTL_SECONDS = int(
+        os.environ.get("RATE_LIMIT_KEY_TTL_SECONDS", "600")
+    )
+
+    # WAF.
+    WAF_GREYLIST_SECONDS = int(os.environ.get("WAF_GREYLIST_SECONDS", "300"))
+    WAF_MAX_BODY_INSPECT = int(
+        os.environ.get("WAF_MAX_BODY_INSPECT", str(64 * 1024))
+    )
+    SECURITY_LOG_CAPACITY = int(os.environ.get("SECURITY_LOG_CAPACITY", "200"))
+
+    # Довіряти X-Forwarded-For можна лише за довіреним reverse-proxy.
+    # Інакше клієнт підробить IP і обійде ліміт.
+    TRUST_PROXY_HEADERS = os.environ.get("TRUST_PROXY_HEADERS", "0") == "1"
+
+    # Лабораторна кнопка Reset для /waf-lab. У production — False.
+    WAF_LAB_ALLOW_RESET = os.environ.get("WAF_LAB_ALLOW_RESET", "1") == "1"
 
     # ------------------------------------------------------------------
     # JWT / Stateless API (ЛР №2)

@@ -43,6 +43,8 @@ class JwtServiceTests(unittest.TestCase):
             (Config,),
             {
                 "TESTING": True,
+                "WAF_ENABLED": False,
+                "RATE_LIMIT_ENABLED": False,
                 "SECRET_KEY": "unit-session-secret",
                 "JWT_SECRET_KEY": TEST_SECRET,
                 "DATABASE": str(cls.temp_dir / "jwt.db"),
@@ -178,6 +180,8 @@ class JwtServiceTests(unittest.TestCase):
             (Config,),
             {
                 "TESTING": True,
+                "WAF_ENABLED": False,
+                "RATE_LIMIT_ENABLED": False,
                 "SECRET_KEY": "short",
                 "JWT_SECRET_KEY": "too-short",
                 "DATABASE": str(self.temp_dir / "short.db"),
