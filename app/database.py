@@ -84,6 +84,28 @@ CREATE TABLE IF NOT EXISTS client_notes (
 
 CREATE INDEX IF NOT EXISTS idx_client_notes_created
     ON client_notes (created_at DESC);
+
+-- ЛР №5: метадані зашифрованих документів. Сам вміст лежить на диску
+-- у бінарному контейнері <uuid>.enc; у БД зберігаються лише метадані
+-- та SHA-256 відкритого тексту для додаткової перевірки цілісності.
+CREATE TABLE IF NOT EXISTS documents (
+    id                TEXT    PRIMARY KEY,
+    owner_id          INTEGER NOT NULL,
+    original_filename TEXT    NOT NULL,
+    stored_filename   TEXT    NOT NULL UNIQUE,
+    content_type      TEXT    NOT NULL DEFAULT 'application/octet-stream',
+    original_size     INTEGER NOT NULL,
+    encrypted_size    INTEGER NOT NULL,
+    sha256            TEXT    NOT NULL,
+    created_at        TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    FOREIGN KEY (owner_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_documents_owner
+    ON documents (owner_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_documents_created
+    ON documents (created_at DESC);
 """
 
 
@@ -436,4 +458,103 @@ def list_client_notes(limit: int = 8) -> list[sqlite3.Row]:
             (limit,),
         ).fetchall()
     )
+
+
+# ---------------------------------------------------------------------------
+# Метадані зашифрованих документів (ЛР №5)
+# ---------------------------------------------------------------------------
+
+def create_document(
+    *,
+    doc_id: str,
+    owner_id: int,
+    original_filename: str,
+    stored_filename: str,
+    content_type: str,
+    original_size: int,
+    encrypted_size: int,
+    sha256: str,
+) -> None:
+    """Зберігає метадані документа; вміст уже лежить у .enc-контейнері."""
+
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO documents (
+            id, owner_id, original_filename, stored_filename,
+            content_type, original_size, encrypted_size, sha256
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            doc_id,
+            owner_id,
+            original_filename,
+            stored_filename,
+            content_type,
+            original_size,
+            encrypted_size,
+            sha256,
+        ),
+    )
+    db.commit()
+
+
+def get_document(doc_id: str) -> sqlite3.Row | None:
+    """Повертає метадані одного документа за UUID."""
+
+    return get_db().execute(
+        """
+        SELECT d.*, u.username AS owner_username
+        FROM documents AS d
+        LEFT JOIN users AS u ON u.id = d.owner_id
+        WHERE d.id = ?
+        """,
+        (doc_id,),
+    ).fetchone()
+
+
+def list_documents_for_user(
+    owner_id: int,
+    *,
+    is_admin: bool = False,
+    limit: int = 50,
+) -> list[sqlite3.Row]:
+    """Повертає документи власника (або всі для адміністратора)."""
+
+    db = get_db()
+    if is_admin:
+        rows = db.execute(
+            """
+            SELECT d.*, u.username AS owner_username
+            FROM documents AS d
+            LEFT JOIN users AS u ON u.id = d.owner_id
+            ORDER BY d.created_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    else:
+        rows = db.execute(
+            """
+            SELECT d.*, u.username AS owner_username
+            FROM documents AS d
+            LEFT JOIN users AS u ON u.id = d.owner_id
+            WHERE d.owner_id = ?
+            ORDER BY d.created_at DESC
+            LIMIT ?
+            """,
+            (owner_id, limit),
+        ).fetchall()
+    return list(rows)
+
+
+def delete_document(doc_id: str) -> bool:
+    """Видаляє метадані; файл видаляє сервісний шар."""
+
+    db = get_db()
+    cursor = db.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+    db.commit()
+    return cursor.rowcount > 0
+
 

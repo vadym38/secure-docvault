@@ -3477,3 +3477,490 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
     gap: 3px;
   }
 }
+
+/* --------------------------------------------------------------------------
+   Cipher Vault — AES-256-GCM файлове сховище (ЛР №5)
+   -------------------------------------------------------------------------- */
+
+.vault-page {
+  background:
+    radial-gradient(980px 560px at 82% -10%, rgba(122, 184, 255, 0.13), transparent 60%),
+    radial-gradient(820px 500px at 4% 8%, rgba(167, 139, 250, 0.09), transparent 58%),
+    var(--bg);
+}
+
+.vault-shell {
+  position: relative;
+  z-index: 1;
+  width: min(1320px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 30px 0 76px;
+}
+
+.vault-hero {
+  max-width: 1040px;
+  margin-bottom: 24px;
+}
+
+.vault-hero h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 4.5vw, 4rem);
+  font-weight: 700;
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+}
+
+.vault-hero .lede {
+  max-width: 940px;
+  margin: 18px 0 0;
+  color: var(--text-soft);
+  font-size: 0.92rem;
+  line-height: 1.65;
+}
+
+.vault-hero .lede code {
+  color: var(--blue);
+}
+
+.vault-hero--detail {
+  max-width: 1100px;
+}
+
+.vault-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.grad--blue {
+  background: linear-gradient(100deg, var(--blue) 0%, #b8d9ff 44%, #b49cff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.pulse-dot--blue {
+  background: var(--blue);
+  box-shadow: 0 0 0 4px rgba(122, 184, 255, 0.14);
+}
+
+.badge--blue {
+  color: var(--blue);
+  border-color: rgba(122, 184, 255, 0.32);
+  background: rgba(122, 184, 255, 0.08);
+}
+
+/* --- Статусні картки ---------------------------------------------------- */
+
+.vault-status {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.vault-stat {
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.008));
+}
+
+.vault-stat__label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.vault-stat strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.18rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.vault-stat small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  line-height: 1.45;
+}
+
+.vault-stat--blue { border-color: rgba(122, 184, 255, 0.28); }
+.vault-stat--blue strong { color: var(--blue); }
+.vault-stat--mint { border-color: rgba(114, 242, 198, 0.26); }
+.vault-stat--mint strong { color: var(--mint); }
+.vault-stat--violet { border-color: rgba(167, 139, 250, 0.3); }
+.vault-stat--violet strong { color: #b49cff; }
+.vault-stat--amber { border-color: rgba(255, 184, 107, 0.28); }
+.vault-stat--amber strong { color: var(--amber); }
+
+/* --- Сітки -------------------------------------------------------------- */
+
+.vault-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 18px;
+}
+
+.vault-panel {
+  margin-bottom: 18px;
+}
+
+/* --- Завантаження ------------------------------------------------------- */
+
+.vault-upload {
+  display: grid;
+  gap: 13px;
+}
+
+.vault-drop {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  padding: 28px 20px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.vault-drop:hover,
+.vault-drop:focus-within {
+  border-color: rgba(122, 184, 255, 0.55);
+  background: rgba(122, 184, 255, 0.045);
+}
+
+.vault-drop input[type="file"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.vault-drop__icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(122, 184, 255, 0.3);
+  border-radius: 14px;
+  color: var(--blue);
+  background: rgba(122, 184, 255, 0.08);
+}
+
+.vault-drop strong {
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.vault-drop > span:last-of-type {
+  color: var(--muted-2);
+  font-size: 0.68rem;
+}
+
+.vault-extensions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.vault-extensions span {
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.56rem;
+}
+
+/* --- Анатомія контейнера ------------------------------------------------ */
+
+.container-anatomy {
+  display: grid;
+  grid-template-columns: 0.8fr 0.9fr 1.8fr;
+  gap: 6px;
+  margin-bottom: 15px;
+}
+
+.container-block {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  padding: 13px 12px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+}
+
+.container-block span {
+  font-family: var(--mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.container-block strong {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+}
+
+.container-block--iv {
+  color: var(--mint);
+  border-color: rgba(114, 242, 198, 0.3);
+  background: rgba(114, 242, 198, 0.06);
+}
+
+.container-block--tag {
+  color: var(--rose);
+  border-color: rgba(255, 124, 145, 0.3);
+  background: rgba(255, 124, 145, 0.06);
+}
+
+.container-block--cipher {
+  color: var(--blue);
+  border-color: rgba(122, 184, 255, 0.3);
+  background: rgba(122, 184, 255, 0.06);
+}
+
+.container-anatomy--detail {
+  grid-template-columns: 1fr;
+}
+
+.container-hex {
+  color: var(--text-soft);
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* --- Факти -------------------------------------------------------------- */
+
+.vault-facts {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.vault-facts > div {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: 12px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+}
+
+.vault-facts > div:first-child {
+  border-top: 0;
+}
+
+.vault-facts dt {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  line-height: 1.45;
+}
+
+.vault-facts dd {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.7rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.vault-facts code {
+  color: var(--blue);
+}
+
+/* --- Таблиця документів ------------------------------------------------- */
+
+.vault-table td {
+  vertical-align: middle;
+}
+
+.vault-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.vault-file .icon {
+  color: var(--blue);
+}
+
+.vault-file:hover {
+  color: var(--blue);
+}
+
+.vault-doc-id {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted-2);
+  font-size: 0.56rem;
+}
+
+.vault-hash {
+  color: var(--mint);
+  overflow-wrap: anywhere;
+}
+
+.vault-row-actions {
+  display: flex;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* --- Hexdump ------------------------------------------------------------ */
+
+.hexdump {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #070c10;
+}
+
+.hexdump__head,
+.hexdump__line {
+  display: grid;
+  grid-template-columns: 80px minmax(320px, 1fr) 180px;
+  gap: 12px;
+  padding: 7px 12px;
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  line-height: 1.5;
+  white-space: pre;
+}
+
+.hexdump__head {
+  border-bottom: 1px solid var(--line);
+  color: var(--muted-2);
+  font-size: 0.56rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hexdump__line {
+  border-top: 1px solid rgba(151, 193, 208, 0.07);
+  color: var(--text-soft);
+}
+
+.hexdump__line:first-of-type {
+  border-top: 0;
+}
+
+.hexdump__line span:first-child {
+  color: var(--blue);
+}
+
+.hexdump__line span:last-child {
+  color: var(--mint);
+}
+
+/* --- Defense grid ------------------------------------------------------- */
+
+.vault-defense {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.vault-defense article {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.vault-defense h3 {
+  margin: 11px 0 6px;
+  font-family: var(--font-display);
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
+.vault-defense p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.vault-defense code {
+  color: var(--text-soft);
+}
+
+/* --- Адаптивність ------------------------------------------------------- */
+
+@media (max-width: 1080px) {
+  .vault-status {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vault-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .vault-defense {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .vault-shell {
+    width: min(100% - 32px, 1320px);
+  }
+
+  .vault-status,
+  .vault-defense {
+    grid-template-columns: 1fr;
+  }
+
+  .container-anatomy {
+    grid-template-columns: 1fr;
+  }
+
+  .vault-facts > div {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+
+  .vault-row-actions {
+    flex-direction: column;
+  }
+
+  .hexdump__head,
+  .hexdump__line {
+    grid-template-columns: 60px 1fr 120px;
+    font-size: 0.56rem;
+  }
+}
+
+.vault-dashboard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

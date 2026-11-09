@@ -1,4 +1,4 @@
-"""Application factory для Secure DocVault (етап 4)."""
+"""Application factory для Secure DocVault (етап 5)."""
 
 from __future__ import annotations
 
@@ -9,10 +9,14 @@ from .auth import auth_bp
 from .client_security import client_bp
 from .config import Config
 from .database import init_app as init_database
+from .documents import DocumentService
+from .documents_api import documents_api_bp
+from .file_crypto import initialize_file_cipher
 from .jwt_service import MIN_SECRET_BYTES
 from .network_guard import install_network_middleware
 from .network_lab import network_bp
 from .security import install_security_middleware
+from .vault import vault_bp
 
 
 def _validate_jwt_config(app: Flask) -> None:
@@ -44,10 +48,20 @@ def create_app(config_object: type = Config) -> Flask:
     _validate_jwt_config(app)
 
     init_database(app)
+    file_cipher = initialize_file_cipher(app)
+    app.extensions["document_service"] = DocumentService(
+        cipher=file_cipher,
+        storage_dir=app.config["DOCUMENT_STORAGE_DIR"],
+        max_bytes=app.config["MAX_DOCUMENT_BYTES"],
+        allowed_extensions=app.config["ALLOWED_DOCUMENT_EXTENSIONS"],
+    )
+
     app.register_blueprint(auth_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(client_bp)
     app.register_blueprint(network_bp)
+    app.register_blueprint(documents_api_bp)
+    app.register_blueprint(vault_bp)
 
     install_network_middleware(app)
     install_security_middleware(app)
@@ -107,6 +121,25 @@ def create_app(config_object: type = Config) -> Flask:
                 message="Цей маршрут не приймає такий HTTP-метод.",
             ),
             405,
+        )
+
+    @app.errorhandler(413)
+    def payload_too_large(_error):
+        if request.path.startswith("/api/"):
+            return jsonify(
+                error={
+                    "code": "payload_too_large",
+                    "message": "Запит перевищує дозволений розмір.",
+                }
+            ), 413
+        return (
+            render_template(
+                "error.html",
+                code=413,
+                title="Файл завеликий",
+                message="Розмір запиту перевищує ліміт сховища.",
+            ),
+            413,
         )
 
     @app.errorhandler(500)

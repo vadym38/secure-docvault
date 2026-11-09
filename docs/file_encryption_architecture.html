@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Secure DocVault · Cipher Vault (ЛР №5)</title>
+<style>
+  :root {
+    --bg: #05080b;
+    --panel: #0c141b;
+    --panel-2: #101b24;
+    --line: rgba(151, 193, 208, 0.16);
+    --line-strong: rgba(151, 193, 208, 0.3);
+    --text: #e9f3f3;
+    --muted: #8aa1a9;
+    --muted-2: #647a83;
+    --mint: #72f2c6;
+    --blue: #7ab8ff;
+    --violet: #b49cff;
+    --rose: #ff7c91;
+    --amber: #ffb86b;
+    --mono: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+    --display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; padding: 42px 48px 54px;
+    color: var(--text); font-family: var(--display);
+    background:
+      radial-gradient(950px 540px at 84% -10%, rgba(122, 184, 255, 0.14), transparent 62%),
+      radial-gradient(820px 480px at 2% 10%, rgba(180, 156, 255, 0.09), transparent 58%),
+      var(--bg);
+  }
+  header { max-width: 1340px; margin: 0 auto 26px; }
+  .eyebrow {
+    display: flex; align-items: center; gap: 9px; margin: 0 0 12px;
+    color: var(--blue); font-family: var(--mono); font-size: 12px;
+    letter-spacing: 0.16em; text-transform: uppercase;
+  }
+  .pulse {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--blue);
+    box-shadow: 0 0 0 5px rgba(122, 184, 255, 0.14);
+  }
+  h1 { margin: 0; max-width: 1080px; font-size: 46px; line-height: 1.02; letter-spacing: -0.045em; }
+  .grad {
+    background: linear-gradient(100deg, var(--blue), #b8d9ff 45%, var(--violet));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .lede { max-width: 1050px; margin: 16px 0 0; color: #c3d4d8; font-size: 15px; line-height: 1.6; }
+
+  .container {
+    display: grid; grid-template-columns: 0.55fr 0.65fr 1.8fr;
+    gap: 8px; max-width: 1340px; margin: 0 auto 22px;
+  }
+  .block {
+    position: relative; padding: 20px 18px 18px; border-radius: 14px;
+    border: 1px solid var(--line); background: linear-gradient(160deg, rgba(255,255,255,0.045), rgba(255,255,255,0.008));
+  }
+  .block__tag {
+    display: inline-block; margin-bottom: 10px; padding: 3px 9px;
+    border-radius: 999px; font-family: var(--mono); font-size: 10px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .block h2 { margin: 0 0 6px; font-size: 17px; }
+  .block p { margin: 0; color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+  .block code { color: var(--text-soft); font-family: var(--mono); font-size: 10.5px; }
+  .block--iv { border-color: rgba(114, 242, 198, 0.34); }
+  .block--iv .block__tag { color: var(--mint); background: rgba(114,242,198,.1); }
+  .block--tag { border-color: rgba(255, 124, 145, 0.34); }
+  .block--tag .block__tag { color: var(--rose); background: rgba(255,124,145,.1); }
+  .block--cipher { border-color: rgba(122, 184, 255, 0.34); }
+  .block--cipher .block__tag { color: var(--blue); background: rgba(122,184,255,.1); }
+  .container-size {
+    display: block; margin-top: 12px; font-family: var(--mono);
+    font-size: 20px; font-weight: 700;
+  }
+
+  .grid {
+    display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 18px;
+    max-width: 1340px; margin: 0 auto 20px;
+  }
+  .panel {
+    padding: 21px; border: 1px solid var(--line); border-radius: 17px;
+    background: linear-gradient(160deg, rgba(255,255,255,0.035), rgba(255,255,255,0.008));
+  }
+  .panel h2 { margin: 0 0 13px; font-size: 16px; }
+  .flow { display: grid; gap: 9px; }
+  .flow__row {
+    display: grid; grid-template-columns: 30px minmax(0, 1fr) auto;
+    gap: 12px; align-items: start; padding: 10px 0;
+    border-top: 1px solid var(--line);
+  }
+  .flow__row:first-child { border-top: 0; }
+  .flow__num {
+    display: grid; place-items: center; width: 26px; height: 26px;
+    border-radius: 8px; color: #08111a; background: linear-gradient(135deg, var(--blue), #b8d9ff);
+    font-family: var(--mono); font-size: 11px; font-weight: 700;
+  }
+  .flow__row strong { display: block; color: var(--text); font-size: 12px; }
+  .flow__row span { color: var(--muted); font-size: 11.5px; line-height: 1.45; }
+  .flow__row code { color: var(--blue); font-family: var(--mono); font-size: 10.5px; }
+  .flow__arrow { color: var(--muted-2); font-size: 14px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  th, td { padding: 8px 9px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { color: var(--muted); font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; }
+  td { color: #c3d4d8; line-height: 1.45; }
+  tr:last-child td { border-bottom: 0; }
+  td code { color: var(--blue); font-family: var(--mono); font-size: 10.5px; }
+  .pill { display: inline-flex; padding: 3px 8px; border-radius: 999px; font-family: var(--mono); font-size: 10px; }
+  .pill--ok { color: var(--mint); background: rgba(114,242,198,.1); border: 1px solid rgba(114,242,198,.3); }
+  .pill--bad { color: var(--rose); background: rgba(255,124,145,.1); border: 1px solid rgba(255,124,145,.3); }
+  .pill--warn { color: var(--amber); background: rgba(255,184,107,.1); border: 1px solid rgba(255,184,107,.3); }
+
+  .threats { display: grid; gap: 10px; }
+  .threat {
+    padding: 12px 13px; border: 1px solid var(--line); border-radius: 12px;
+    background: rgba(4,8,11,0.35);
+  }
+  .threat strong { display: block; font-size: 12px; margin-bottom: 3px; }
+  .threat span { color: var(--muted); font-size: 11px; line-height: 1.45; }
+  .threat code { color: var(--mint); font-family: var(--mono); font-size: 10.5px; }
+
+  .footer {
+    max-width: 1340px; margin: 0 auto; padding: 18px 22px;
+    border: 1px solid rgba(122,184,255,0.24); border-radius: 17px;
+    background: rgba(122,184,255,0.055);
+    color: #c3d4d8; font-size: 12.5px; line-height: 1.55;
+  }
+  .footer strong { color: var(--blue); }
+</style>
+</head>
+<body>
+  <header>
+    <p class="eyebrow"><span class="pulse"></span> Cipher vault / data at rest</p>
+    <h1>Три частини контейнера — <span class="grad">один автентифікований файл.</span></h1>
+    <p class="lede">
+      AES-256-GCM шифрує вміст і одночасно обчислює 16-байтний Auth Tag.
+      Для кожного файлу генерується новий 96-бітний IV. Навіть якщо диск,
+      бекап або каталог <code>instance/vault</code> викрадено, без ключа
+      залишається лише нечитабельний ciphertext.
+    </p>
+  </header>
+
+  <section class="container" aria-label="Формат шифроконтейнера">
+    <article class="block block--iv">
+      <span class="block__tag">01 · Nonce</span>
+      <h2>IV / Nonce</h2>
+      <p><code>os.urandom(12)</code> для кожної операції. Повторне використання IV з одним ключем ламає GCM.</p>
+      <span class="container-size">12 B</span>
+    </article>
+    <article class="block block--tag">
+      <span class="block__tag">02 · Integrity</span>
+      <h2>Auth Tag</h2>
+      <p>Обчислюється GCM над ciphertext + AAD. Будь-яка зміна байта → <code>InvalidTag</code>.</p>
+      <span class="container-size">16 B</span>
+    </article>
+    <article class="block block--cipher">
+      <span class="block__tag">03 · Confidentiality</span>
+      <h2>Ciphertext</h2>
+      <p>Той самий розмір, що й plaintext. Не містить імені файлу, MIME-типу чи метаданих.</p>
+      <span class="container-size">N B</span>
+    </article>
+  </section>
+
+  <section class="grid">
+    <div class="panel">
+      <h2>Потік завантаження</h2>
+      <div class="flow">
+        <div class="flow__row">
+          <span class="flow__num">1</span>
+          <div><strong>Перевірка прав і валідація</strong><span>JWT/session, owner/admin, розширення, розмір, санітизація імені.</span></div>
+          <span class="flow__arrow">→</span>
+        </div>
+        <div class="flow__row">
+          <span class="flow__num">2</span>
+          <div><strong>Генерація UUID та IV</strong><span><code>uuid.uuid4()</code> + <code>os.urandom(12)</code>; AAD = <code>docvault|file|v1|id|owner</code>.</span></div>
+          <span class="flow__arrow">→</span>
+        </div>
+        <div class="flow__row">
+          <span class="flow__num">3</span>
+          <div><strong>AES-256-GCM encrypt</strong><span><code>ciphertext || tag</code> розділяється на <code>[IV][Tag][Ciphertext]</code>.</span></div>
+          <span class="flow__arrow">→</span>
+        </div>
+        <div class="flow__row">
+          <span class="flow__num">4</span>
+          <div><strong>Атомарний запис + метадані</strong><span><code>os.replace()</code> у <code>instance/vault/&lt;uuid&gt;.enc</code>; SQLite зберігає SHA-256 plaintext.</span></div>
+          <span class="flow__arrow">→</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Потік скачування</h2>
+      <div class="flow">
+        <div class="flow__row">
+          <span class="flow__num">1</span>
+          <div><strong>Авторизація</strong><span>Bearer token або сесія; перевірка <code>owner_id</code> / <code>admin</code>.</span></div>
+          <span class="flow__arrow">→</span>
+        </div>
+        <div class="flow__row">
+          <span class="flow__num">2</span>
+          <div><strong>Читання контейнера</strong><span>IV, Tag, Ciphertext; AAD відновлюється з метаданих.</span></div>
+          <span class="flow__arrow">→</span>
+        </div>
+        <div class="flow__row">
+          <span class="flow__num">3</span>
+          <div><strong>AES-GCM decrypt</strong><span>Спочатку перевіряється tag; при <code>InvalidTag</code> → <code>409 integrity_error</code>.</span></div>
+          <span class="flow__arrow">→</span>
+        </div>
+        <div class="flow__row">
+          <span class="flow__num">4</span>
+          <div><strong>SHA-256 + видача</strong><span>Хеш plaintext звіряється з БД; лише після цього <code>send_file</code>.</span></div>
+          <span class="flow__arrow">→</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="panel">
+      <h2>Чому AEAD, а не ECB/CBC/CTR</h2>
+      <table>
+        <thead><tr><th>Режим</th><th>Конфіденційність</th><th>Цілісність</th><th>Ризик</th></tr></thead>
+        <tbody>
+          <tr><td><code>ECB</code></td><td>формально</td><td>немає</td><td><span class="pill pill--bad">однакові блоки → шаблони</span></td></tr>
+          <tr><td><code>CBC</code></td><td>так</td><td>лише з HMAC</td><td><span class="pill pill--warn">padding oracle / MAC-then-Encrypt</span></td></tr>
+          <tr><td><code>CTR</code></td><td>так</td><td>немає</td><td><span class="pill pill--bad">bit-flipping</span></td></tr>
+          <tr><td><code>GCM</code></td><td>так</td><td>вбудована</td><td><span class="pill pill--ok">AEAD, один ключ</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h2>Модель загроз</h2>
+      <div class="threats">
+        <div class="threat"><strong>Викрадення диска / бекапу</strong><span>Без ключа — лише ciphertext; ключ зберігається окремо в <code>FILE_ENCRYPTION_KEY</code>.</span></div>
+        <div class="threat"><strong>Модифікація 1 байта</strong><span>GCM tag не збігається → <code>InvalidTag</code> → <code>409</code>, файл не видається.</span></div>
+        <div class="threat"><strong>IDOR / перебір UUID</strong><span>UUID4 + перевірка owner/admin; AAD прив'язує контейнер до документа.</span></div>
+        <div class="threat"><strong>Підміна контейнера</strong><span>AAD містить <code>document_id</code> та <code>owner_id</code>; чужий tag не підійде.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer">
+    <strong>Висновок:</strong> AES-256-GCM дає одночасно конфіденційність і
+    цілісність, але вимагає унікального IV, захищеного ключа та перевірки
+    прав. У Secure DocVault це поєднано з атомарним записом, SHA-256,
+    AAD та контролем власника; WAF, CSP і санітизація з ЛР №3–4
+    залишаються окремими шарами Defense in Depth.
+  </div>
+</body>
+</html>

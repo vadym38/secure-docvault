@@ -1,10 +1,10 @@
-"""Конфігурація застосунку Secure DocVault (етап 4).
+"""Конфігурація застосунку Secure DocVault (етап 5).
 
 Усі секрети та шляхи читаються зі змінних оточення. Для локального запуску
 використовуйте файл .env (див. .env.example). У виробничому середовищі
-обов'язково задайте власні SECRET_KEY і JWT_SECRET_KEY, увімкніть
-SESSION_COOKIE_SECURE, обмежте CORS_ALLOWED_ORIGINS та налаштуйте
-WAF/rate limiting під реальний профіль трафіку.
+обов'язково задайте власні SECRET_KEY, JWT_SECRET_KEY і
+FILE_ENCRYPTION_KEY, увімкніть SESSION_COOKIE_SECURE, обмежте
+CORS_ALLOWED_ORIGINS та налаштуйте WAF/rate limiting.
 """
 
 from __future__ import annotations
@@ -58,7 +58,40 @@ class Config:
     CLIENT_LAB_MAX_TEXT = int(os.environ.get("CLIENT_LAB_MAX_TEXT", "2000"))
 
     # Обмеження розміру запиту: форми автентифікації не потребують великих тіл.
-    MAX_CONTENT_LENGTH = 1 * 1024 * 1024
+    # Для ЛР №5 ліміт збільшено під завантаження документів.
+    MAX_DOCUMENT_BYTES = int(os.environ.get("MAX_DOCUMENT_BYTES", str(5 * 1024 * 1024)))
+    MAX_CONTENT_LENGTH = max(8 * 1024 * 1024, MAX_DOCUMENT_BYTES + 512 * 1024)
+
+    # ------------------------------------------------------------------
+    # Шифрування файлів у стані спокою (ЛР №5)
+    # ------------------------------------------------------------------
+
+    # 32-байтний AES-256 ключ у hex (64 символи). Порожнє значення в
+    # локальному стенді означає ефемерний ключ; у production задайте
+    # FILE_ENCRYPTION_KEY_REQUIRED=1.
+    FILE_ENCRYPTION_KEY = os.environ.get("FILE_ENCRYPTION_KEY", "")
+    FILE_ENCRYPTION_KEY_OLD = os.environ.get("FILE_ENCRYPTION_KEY_OLD", "")
+    FILE_ENCRYPTION_KEY_REQUIRED = (
+        os.environ.get("FILE_ENCRYPTION_KEY_REQUIRED", "0") == "1"
+    )
+
+    # Каталог для бінарних .enc-контейнерів (не в git; instance/ ігнорується).
+    DOCUMENT_STORAGE_DIR = os.environ.get(
+        "DOCUMENT_STORAGE_DIR",
+        str(BASE_DIR / "instance" / "vault"),
+    )
+
+    # Розширення, які дозволено завантажувати. SVG/HTML/JS навмисно
+    # відсутні, щоб не перетворити сховище на XSS-репозиторій.
+    ALLOWED_DOCUMENT_EXTENSIONS = frozenset(
+        "." + extension.strip().lower().lstrip(".")
+        for extension in os.environ.get(
+            "ALLOWED_DOCUMENT_EXTENSIONS",
+            "pdf,txt,md,csv,json,docx,doc,xlsx,xls,pptx,ppt,"
+            "png,jpg,jpeg,gif,zip",
+        ).split(",")
+        if extension.strip()
+    )
 
     # ------------------------------------------------------------------
     # WAF та Rate Limiting (ЛР №4)

@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+
+{% block body_class %}vault-page{% endblock %}
+{% block title %}Cipher Vault · Secure DocVault{% endblock %}
+
+{% block content %}
+<main class="vault-shell">
+  <header class="lab-head">
+    {% include "_brand.html" %}
+    <nav class="api-head-actions" aria-label="Навігація">
+      <a class="btn btn--ghost" href="{{ url_for('network.lab_index') }}">WAF</a>
+      <a class="btn btn--ghost" href="{{ url_for('client.lab_index') }}">Клієнтський захист</a>
+      <a class="btn btn--ghost" href="{{ url_for('auth.dashboard') }}">Кабінет</a>
+      <a class="btn btn--ghost" href="{{ url_for('auth.index') }}">
+        {{ icon('arrow', 'icon--back') }}<span>Назад</span>
+      </a>
+    </nav>
+  </header>
+
+  <section class="vault-hero">
+    <p class="eyebrow"><span class="pulse-dot pulse-dot--blue"></span> Cipher vault / AES-256-GCM</p>
+    <h1>Файли, які на диску <span class="grad grad--blue">не мають сенсу.</span></h1>
+    <p class="lede">
+      Кожен документ перетворюється на бінарний контейнер
+      <code>[12 B IV][16 B Tag][Ciphertext]</code>. Навіть повний дамп
+      каталогу <code>instance/vault</code> не містить відкритого тексту:
+      без 256-бітного ключа це лише шум. Перед видачею AES-GCM перевіряє
+      tag, тому зміна одного байта блокує скачування.
+    </p>
+  </section>
+
+  <section class="vault-status">
+    <article class="vault-stat vault-stat--blue">
+      <span class="vault-stat__label">Алгоритм</span>
+      <strong>AES-256-GCM</strong>
+      <small>AEAD · 12 B nonce · 16 B tag</small>
+    </article>
+    <article class="vault-stat vault-stat--mint">
+      <span class="vault-stat__label">Ключ</span>
+      <strong class="mono">{{ key_fingerprint }}</strong>
+      <small>SHA-256 fingerprint · ключів: {{ key_count }}</small>
+    </article>
+    <article class="vault-stat vault-stat--violet">
+      <span class="vault-stat__label">Документи</span>
+      <strong>{{ stats.count }}</strong>
+      <small>{{ stats.plaintext_bytes }} B відкрито → {{ stats.encrypted_bytes }} B на диску</small>
+    </article>
+    <article class="vault-stat vault-stat--amber">
+      <span class="vault-stat__label">Сховище</span>
+      <strong class="mono">instance/{{ storage_name }}/</strong>
+      <small>лише .enc-контейнери · ліміт {{ (max_bytes / 1024 / 1024)|round(1) }} МБ</small>
+    </article>
+  </section>
+
+  <div class="vault-grid">
+    <section class="panel vault-panel">
+      <div class="panel__head">
+        <h2>Завантажити документ</h2>
+        <span class="badge badge--blue">encrypt on write</span>
+      </div>
+
+      <form class="vault-upload" method="post" action="{{ url_for('vault.upload') }}"
+            enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="vault-drop" for="document-file">
+          <span class="vault-drop__icon">{{ icon('lock') }}</span>
+          <strong id="file-name">Оберіть файл або перетягніть його сюди</strong>
+          <span>Файл буде зашифровано до запису на диск</span>
+          <input id="document-file" type="file" name="file" required>
+        </label>
+
+        <div class="vault-extensions">
+          {% for extension in allowed_extensions %}
+            <span class="mono">{{ extension }}</span>
+          {% endfor %}
+        </div>
+
+        <button class="btn btn--primary btn--wide" type="submit">
+          {{ icon('shield') }}<span>Зашифрувати та зберегти</span>
+        </button>
+      </form>
+
+      <p class="api-note">
+        Ліміт: {{ max_bytes }} байт. Ім'я файлу проходить санітизацію
+        Bleach, розширення — allowlist. SHA-256 відкритого тексту
+        зберігається в метаданих для додаткової перевірки.
+      </p>
+    </section>
+
+    <section class="panel vault-panel">
+      <div class="panel__head">
+        <h2>Анатомія контейнера</h2>
+        <span class="badge badge--ok">AES-GCM</span>
+      </div>
+
+      <div class="container-anatomy" aria-label="Формат шифроконтейнера">
+        <div class="container-block container-block--iv">
+          <span>IV / Nonce</span>
+          <strong>12 B</strong>
+        </div>
+        <div class="container-block container-block--tag">
+          <span>Auth Tag</span>
+          <strong>16 B</strong>
+        </div>
+        <div class="container-block container-block--cipher">
+          <span>Ciphertext</span>
+          <strong>N B</strong>
+        </div>
+      </div>
+
+      <dl class="vault-facts">
+        <div><dt>IV</dt><dd><code>os.urandom(12)</code> для кожного файлу</dd></div>
+        <div><dt>Tag</dt><dd>перевіряється до повернення plaintext</dd></div>
+        <div><dt>AAD</dt><dd><code>docvault|file|v1|id|owner</code></dd></div>
+        <div><dt>Key rotation</dt><dd>старий ключ можна додати в <code>FILE_ENCRYPTION_KEY_OLD</code></dd></div>
+      </dl>
+    </section>
+  </div>
+
+  <section class="panel vault-panel" id="vault-documents">
+    <div class="panel__head">
+      <h2>Зашифровані документи</h2>
+      <span class="badge">{{ documents|length }} файлів</span>
+    </div>
+
+    <div class="table-wrap">
+      <table class="data-table vault-table">
+        <thead>
+          <tr>
+            <th>Файл</th><th>Розмір</th><th>Контейнер</th>
+            <th>SHA-256</th><th>Створено</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in documents %}
+            <tr>
+              <td>
+                <a class="vault-file" href="{{ url_for('vault.document_detail', doc_id=item.document_id) }}">
+                  {{ icon('lock') }}<span>{{ item.original_filename }}</span>
+                </a>
+                <small class="mono vault-doc-id">{{ item.document_id }}</small>
+              </td>
+              <td class="mono">{{ item.size_bytes }} B</td>
+              <td class="mono">{{ item.encrypted_size_bytes }} B</td>
+              <td class="mono vault-hash">{{ item.sha256[:16] }}…</td>
+              <td class="mono">{{ item.created_at }}</td>
+              <td class="vault-row-actions">
+                <a class="btn btn--ghost btn--small" href="{{ url_for('vault.document_detail', doc_id=item.document_id) }}">Деталі</a>
+                <a class="btn btn--secondary btn--small" href="{{ url_for('vault.download', doc_id=item.document_id) }}">Скачати</a>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="6" class="empty-cell">
+                Сховище порожнє. Завантажте перший документ — він одразу
+                перетвориться на AES-256-GCM контейнер.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="api-note">
+      API: <code>POST /api/v1/documents/upload</code>,
+      <code>GET /api/v1/documents/&lt;id&gt;/download</code> із
+      <code>Authorization: Bearer</code>. Веб-інтерфейс використовує ту саму
+      сервісну логіку та перевірку власника.
+    </p>
+  </section>
+
+  <section class="vault-defense">
+    <article>
+      <span class="icon-tile">{{ icon('shield') }}</span>
+      <h3>Конфіденційність</h3>
+      <p>Без ключа контейнер не відрізнити від випадкових байтів.</p>
+    </article>
+    <article>
+      <span class="icon-tile">{{ icon('check') }}</span>
+      <h3>Цілісність</h3>
+      <p>16-байтний GCM tag виявляє будь-яку зміну IV, tag або ciphertext.</p>
+    </article>
+    <article>
+      <span class="icon-tile">{{ icon('key') }}</span>
+      <h3>Ізоляція</h3>
+      <p>AAD прив'язує контейнер до UUID документа та власника.</p>
+    </article>
+    <article>
+      <span class="icon-tile">{{ icon('eye') }}</span>
+      <h3>Контроль доступу</h3>
+      <p>Власник або адміністратор; UUID замість прямих ID.</p>
+    </article>
+  </section>
+</main>
+
+<script src="{{ url_for('static', filename='js/vault.js') }}" defer></script>
+{% endblock %}

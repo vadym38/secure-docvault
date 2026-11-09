@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+
+{% block body_class %}vault-page{% endblock %}
+{% block title %}{{ document.original_filename }} · Cipher Vault{% endblock %}
+
+{% block content %}
+<main class="vault-shell">
+  <header class="lab-head">
+    {% include "_brand.html" %}
+    <nav class="api-head-actions" aria-label="Навігація">
+      <a class="btn btn--ghost" href="{{ url_for('vault.index') }}">До сховища</a>
+      <a class="btn btn--ghost" href="{{ url_for('auth.dashboard') }}">Кабінет</a>
+    </nav>
+  </header>
+
+  <section class="vault-hero vault-hero--detail">
+    <p class="eyebrow"><span class="pulse-dot pulse-dot--blue"></span> Encrypted container / document detail</p>
+    <h1>{{ document.original_filename }}</h1>
+    <p class="lede">
+      Контейнер <code>{{ document.total_size }} B</code> на диску. IV і tag
+      відділені від ciphertext, а AAD прив'язує його до
+      <code>{{ document.document_id }}</code>. Перед скачуванням сервіс
+      перевіряє GCM tag і SHA-256.
+    </p>
+    <div class="vault-detail-actions">
+      <a class="btn btn--primary" href="{{ url_for('vault.download', doc_id=document.document_id) }}">
+        {{ icon('lock') }}<span>Розшифрувати та скачати</span>
+      </a>
+      <form method="post" action="{{ url_for('vault.delete', doc_id=document.document_id) }}"
+            class="vault-delete-form"
+            data-confirm="Видалити документ і контейнер?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn--ghost" type="submit">Видалити</button>
+      </form>
+    </div>
+  </section>
+
+  <div class="vault-grid">
+    <section class="panel vault-panel">
+      <div class="panel__head">
+        <h2>Метадані</h2>
+        <span class="badge badge--ok">owner only</span>
+      </div>
+      <dl class="vault-facts">
+        <div><dt>Шифрування</dt><dd><code>AES-256-GCM</code></dd></div>
+        <div><dt>Document ID</dt><dd class="mono">{{ document.document_id }}</dd></div>
+        <div><dt>Власник</dt><dd>{{ document.owner or "—" }} · id {{ document.owner_id }}</dd></div>
+        <div><dt>Content-Type</dt><dd class="mono">{{ document.content_type }}</dd></div>
+        <div><dt>Відкритий розмір</dt><dd class="mono">{{ document.size_bytes }} B</dd></div>
+        <div><dt>Контейнер</dt><dd class="mono">{{ document.encrypted_size_bytes }} B</dd></div>
+        <div><dt>SHA-256 plaintext</dt><dd class="mono vault-hash">{{ document.sha256 }}</dd></div>
+        <div><dt>Створено</dt><dd class="mono">{{ document.created_at }}</dd></div>
+        <div><dt>Ключ</dt><dd class="mono">{{ key_fingerprint }}</dd></div>
+      </dl>
+    </section>
+
+    <section class="panel vault-panel">
+      <div class="panel__head">
+        <h2>Розбір контейнера</h2>
+        <span class="badge badge--blue">[IV][Tag][Ciphertext]</span>
+      </div>
+      <div class="container-anatomy container-anatomy--detail">
+        <div class="container-block container-block--iv">
+          <span>IV / Nonce</span>
+          <strong>12 B</strong>
+          <code class="container-hex">{{ document.nonce_hex }}</code>
+        </div>
+        <div class="container-block container-block--tag">
+          <span>Auth Tag</span>
+          <strong>16 B</strong>
+          <code class="container-hex">{{ document.tag_hex }}</code>
+        </div>
+        <div class="container-block container-block--cipher">
+          <span>Ciphertext</span>
+          <strong>{{ document.ciphertext_size }} B</strong>
+          <code class="container-hex">{{ document.ciphertext_hex }}…</code>
+        </div>
+      </div>
+      <p class="api-note">
+        Tag зберігається перед ciphertext. Якщо змінити хоча б один байт
+        IV, tag або ciphertext, <code>AESGCM.decrypt()</code> викличе
+        <code>InvalidTag</code>, і сервіс поверне <code>409 integrity_error</code>.
+      </p>
+    </section>
+  </div>
+
+  <section class="panel vault-panel">
+    <div class="panel__head">
+      <h2>Hexdump зашифрованого файлу</h2>
+      <span class="badge">перші {{ document.hexdump_size }} B</span>
+    </div>
+    <div class="hexdump">
+      <div class="hexdump__head">
+        <span>offset</span><span>hex</span><span>ascii</span>
+      </div>
+      {% for line in document.hexdump %}
+        <div class="hexdump__line">
+          <span class="mono">{{ line.offset }}</span>
+          <span class="mono">{{ line.hex }}</span>
+          <span class="mono">{{ line.ascii }}</span>
+        </div>
+      {% endfor %}
+    </div>
+    {% if document.hexdump_truncated %}
+      <p class="api-note">Показано перші {{ document.hexdump_size }} байт контейнера.</p>
+    {% endif %}
+    <p class="api-note">
+      Відкритий текст не зберігається: у контейнері немає ні імені файлу,
+      ні MIME-типу, ні plaintext. Метадані лежать окремо в SQLite.
+    </p>
+  </section>
+
+  <section class="vault-defense">
+    <article>
+      <span class="icon-tile">{{ icon('shield') }}</span>
+      <h3>AEAD</h3>
+      <p>Один ключ і один tag захищають і конфіденційність, і цілісність.</p>
+    </article>
+    <article>
+      <span class="icon-tile">{{ icon('key') }}</span>
+      <h3>Унікальний IV</h3>
+      <p>Новий <code>os.urandom(12)</code> для кожної операції шифрування.</p>
+    </article>
+    <article>
+      <span class="icon-tile">{{ icon('check') }}</span>
+      <h3>SHA-256</h3>
+      <p>Додаткова перевірка після успішного GCM-дешифрування.</p>
+    </article>
+    <article>
+      <span class="icon-tile">{{ icon('eye') }}</span>
+      <h3>IDOR</h3>
+      <p>UUID + перевірка власника; адміністратор має окремий доступ.</p>
+    </article>
+  </section>
+</main>
+
+<script src="{{ url_for('static', filename='js/vault.js') }}" defer></script>
+{% endblock %}

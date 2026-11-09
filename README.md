@@ -1,9 +1,9 @@
-# Secure DocVault — етап 4: WAF, Rate Limiting і мережевий захист
+# Secure DocVault — етап 5: AES-256-GCM шифрування файлів
 
-Навчальний проєкт до лабораторних робіт №1–4 з дисципліни
+Навчальний проєкт до лабораторних робіт №1–5 з дисципліни
 **«Технології захисту інформаційних ресурсів»**.
 
-Реалізовано чотири шари захисту корпоративного порталу **Secure DocVault**:
+Реалізовано п'ять шарів захисту корпоративного порталу **Secure DocVault**:
 
 1. **ЛР №1 — автентифікація та захист БД:** реєстрація, вхід, безпечне
    зберігання паролів у SQLite, захист від SQL-ін'єкцій, CSRF і session
@@ -19,19 +19,40 @@
 4. **ЛР №4 — мережевий захист рівня застосунку:** сигнатурний WAF,
    Greylist для IP, Sliding Window Rate Limiting із диференційованими
    лімітами для login/API/HTML, коректні `403`/`429` та журнал інцидентів.
+5. **ЛР №5 — шифрування даних у стані спокою:** AES-256-GCM,
+   унікальний 96-бітний IV, контейнер `[12 B IV][16 B Tag][Ciphertext]`,
+   завантаження/скачування з перевіркою прав, `InvalidTag` при зміні
+   одного байта.
 
 Замість десктопного PyQt-інтерфейсу з прикладу зроблено **веб-інтерфейс
 на Flask + Jinja2** з авторським темним дизайном «Obsidian Vault»,
-інтерактивними стендами `/api-lab`, `/client-lab` і `/waf-lab`.
+інтерактивними стендами `/api-lab`, `/client-lab`, `/waf-lab` і
+Cipher Vault `/vault`.
 
 > **Статус:** виконано ЛР №1 (тег `v0.1-auth-db`), ЛР №2
-> (тег `v0.2-jwt-api`), ЛР №3 (тег `v0.3-client-security`) і ЛР №4
-> (тег `v0.4-waf-ratelimit`). Шифрування файлів та цифрові підписи з
-> наступних етапів навмисно не додані.
+> (тег `v0.2-jwt-api`), ЛР №3 (тег `v0.3-client-security`), ЛР №4
+> (тег `v0.4-waf-ratelimit`) і ЛР №5 (тег `v0.5-file-encryption`).
+> Цифрові підписи з наступного етапу навмисно не додані.
 
 ---
 
 ## 1. Що демонструє проєкт
+
+### ЛР №5 — AES-256-GCM шифрування файлів
+
+| Вимога ЛР | Реалізація |
+|---|---|
+| AES-256-GCM | `app/file_crypto.py`: `FileCipher`, `cryptography` 50.0.2 |
+| Унікальний IV 96 біт | `os.urandom(12)` для кожної операції |
+| Формат контейнера | `[12 B IV][16 B Auth Tag][Ciphertext]` |
+| UUID замість прямих ID | `uuid.uuid4()` для `id` і `<uuid>.enc` |
+| Upload endpoint | `POST /api/v1/documents/upload` + `Authorization: Bearer` |
+| Download endpoint | `GET /api/v1/documents/<id>/download` |
+| Перевірка прав / IDOR | owner або admin; `AAD = docvault\|file\|v1\|id\|owner` |
+| Цілісність | `InvalidTag` → `409 integrity_error`; додатково SHA-256 plaintext |
+| Веб-інтерфейс | `/vault`, `/vault/<id>`, hexdump контейнера |
+| Тести | 41 новий: 20 unit crypto, 17 інтеграційних, 4 Selenium E2E |
+| Звіт | `docs/screenshots 5/`, `docs/file_encryption_architecture.html` |
 
 ### ЛР №4 — WAF і Rate Limiting
 
@@ -107,6 +128,7 @@
 - **Flask 3.1** + Jinja2 — серверний рендеринг і REST API
 - **PyJWT 2.15** — підпис та валідація JWT (HS256)
 - **Bleach 6.4** — санітизація HTML/JS-векторів у користувацькому вводі
+- **cryptography 50.0.2** — AES-256-GCM (AEAD) для файлів у стані спокою
 - **SQLite** — локальна реляційна БД, режим WAL
 - **bcrypt 5.0** — хешування паролів, work factor 12
 - **HTML/CSS/vanilla JS** — адаптивний інтерфейс без зовнішніх CDN
@@ -137,9 +159,13 @@ secure-docvault/
 │   ├── rate_limiter.py          # ЛР №4: Sliding Window Log
 │   ├── security_events.py       # ЛР №4: кільцевий журнал інцидентів
 │   ├── waf_filter.py            # ЛР №4: сигнатури атак і Greylist
+│   ├── file_crypto.py           # ЛР №5: AES-256-GCM, IV+Tag+Ciphertext
+│   ├── documents.py             # ЛР №5: сервіс сховища, IDOR, integrity
+│   ├── documents_api.py         # ЛР №5: /api/v1/documents/*
+│   ├── vault.py                 # ЛР №5: веб-інтерфейс /vault
 │   ├── jwt_service.py           # випуск/декодування JWT, заборона alg:none
-│   ├── config.py                # конфігурація з .env (сесії, JWT, CORS, WAF)
-│   ├── database.py              # users, refresh_tokens, client_notes
+│   ├── config.py                # конфігурація з .env (сесії, JWT, CORS, WAF, AES)
+│   ├── database.py              # users, refresh_tokens, client_notes, documents
 │   ├── static/
 │   │   ├── css/app.css          # тема «Obsidian Vault»
 │   │   ├── js/app.js            # strength meter, показ пароля, flash
@@ -147,7 +173,8 @@ secure-docvault/
 │   │   ├── js/client_lab.js     # швидкі XSS-payload у формі санітизатора
 │   │   ├── js/client_lab_csp.js # securitypolicyviolation → консоль/таблиця
 │   │   ├── js/client_lab_cookies.js # демонстрація document.cookie
-│   │   └── js/waf_lab.js        # стрес-тест, WAF-атаки, журнал, Reset
+│   │   ├── js/waf_lab.js        # стрес-тест, WAF-атаки, журнал, Reset
+│   │   └── js/vault.js          # ім'я файлу, confirm видалення
 │   └── templates/
 │       ├── _brand.html
 │       ├── _client_nav.html
@@ -160,6 +187,8 @@ secure-docvault/
 │       ├── client_lab_cors.html
 │       ├── network_block.html   # стилізовані 403/429
 │       ├── waf_lab.html         # панель WAF / Rate Limiting
+│       ├── vault.html           # Cipher Vault: список і завантаження
+│       ├── vault_document.html  # detail + hexdump контейнера
 │       ├── auth_base.html
 │       ├── base.html
 │       ├── dashboard.html
@@ -172,6 +201,8 @@ secure-docvault/
 │   ├── screenshots 2/           # 10 скриншотів ЛР №2
 │   ├── screenshots 3/           # скриншоти ЛР №3
 │   ├── screenshots 4/           # скриншоти ЛР №4
+│   ├── screenshots 5/           # скриншоти ЛР №5
+│   ├── file_encryption_architecture.html # схема AES-GCM
 │   ├── network_security_architecture.html # схема WAF / Rate Limiter
 │   ├── client_security_architecture.html # схема ешелонованого захисту
 │   ├── jwt_architecture.html    # схема обміну токенами
@@ -183,7 +214,10 @@ secure-docvault/
 │   ├── capture_screenshots_lab2.py  # скриншоти ЛР №2
 │   ├── capture_screenshots_lab3.py  # скриншоти ЛР №3
 │   ├── capture_screenshots_lab4.py  # скриншоти ЛР №4
+│   ├── capture_screenshots_lab5.py  # скриншоти ЛР №5
 │   ├── stress_test_lab4.py      # стрес-тест 10 запитів + WAF
+│   ├── demo_lab5_api.py         # login → upload → download
+│   ├── integrity_test_lab5.py   # hexdump + InvalidTag
 │   ├── jwt_db_snapshot.py       # HTML-знімок refresh_tokens
 │   ├── db_snapshot.py           # HTML-знімок users
 │   └── seed_demo.py             # створення демо-користувача
@@ -200,7 +234,10 @@ secure-docvault/
 │   ├── test_rate_limiter.py     # 9 юніт-тестів Rate Limiter
 │   ├── test_waf_filter.py       # 33 юніт-тести WAF / Greylist
 │   ├── test_network_security.py # 18 інтеграційних тестів ЛР №4
-│   └── test_network_security_e2e.py # 6 Selenium E2E-тестів ЛР №4
+│   ├── test_network_security_e2e.py # 6 Selenium E2E-тестів ЛР №4
+│   ├── test_file_crypto.py      # 20 юніт-тестів AES-GCM
+│   ├── test_documents.py        # 17 інтеграційних тестів сховища
+│   └── test_documents_e2e.py    # 4 Selenium E2E-тести Cipher Vault
 ├── .env.example
 ├── .gitignore
 ├── README.md
@@ -221,7 +258,7 @@ python -m venv venv
 .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 Copy-Item .env.example .env
-# відредагуйте .env: SECRET_KEY і JWT_SECRET_KEY
+# відредагуйте .env: SECRET_KEY, JWT_SECRET_KEY, FILE_ENCRYPTION_KEY
 python run.py
 ```
 
@@ -233,7 +270,7 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-# відредагуйте .env: SECRET_KEY і JWT_SECRET_KEY
+# відредагуйте .env: SECRET_KEY, JWT_SECRET_KEY, FILE_ENCRYPTION_KEY
 python run.py
 ```
 
@@ -305,6 +342,21 @@ PORT=5000
 | GET | `/waf-lab` | панель WAF, Rate Limiter, Greylist і журналу |
 | GET | `/waf-lab/events` | JSON для живого оновлення журналу |
 | POST | `/waf-lab/reset` | лабораторний скид стану (CSRF + config-прапорець) |
+
+### Зашифроване сховище (ЛР №5)
+
+| Метод | Маршрут | Доступ | Призначення |
+|---|---|---|---|
+| GET | `/vault` | сесія | список документів і форма завантаження |
+| POST | `/vault/upload` | сесія + CSRF | шифрування та збереження файлу |
+| GET | `/vault/<id>` | власник/admin | метадані, IV/Tag/Ciphertext, hexdump |
+| GET | `/vault/<id>/download` | власник/admin | дешифрування та видача файлу |
+| POST | `/vault/<id>/delete` | власник/admin | видалення метаданих і `.enc` |
+| POST | `/api/v1/documents/upload` | Bearer | upload + AES-256-GCM |
+| GET | `/api/v1/documents` | Bearer | список своїх документів |
+| GET | `/api/v1/documents/<id>` | Bearer | метадані + hex-прев'ю |
+| GET | `/api/v1/documents/<id>/download` | Bearer | decrypt + `InvalidTag` → 409 |
+| DELETE | `/api/v1/documents/<id>` | Bearer | видалення документа |
 
 ### REST API v1 (ЛР №2)
 
@@ -412,6 +464,27 @@ CREATE TABLE IF NOT EXISTS client_notes (
 У `description` і `filename` записується **уже санітизований** текст.
 Поле `blocked_vectors` зберігає перелік нейтралізованих тегів/обробників
 для навчального протоколу; сирий HTML у БД не потрапляє.
+
+### `documents` (ЛР №5)
+
+```sql
+CREATE TABLE IF NOT EXISTS documents (
+    id                TEXT    PRIMARY KEY,
+    owner_id          INTEGER NOT NULL,
+    original_filename TEXT    NOT NULL,
+    stored_filename   TEXT    NOT NULL UNIQUE,
+    content_type      TEXT    NOT NULL DEFAULT 'application/octet-stream',
+    original_size     INTEGER NOT NULL,
+    encrypted_size    INTEGER NOT NULL,
+    sha256            TEXT    NOT NULL,
+    created_at        TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    FOREIGN KEY (owner_id) REFERENCES users (id) ON DELETE CASCADE
+);
+```
+
+`id` — випадковий UUID4, `stored_filename` — `<uuid>.enc`. Сам вміст
+лежить у каталозі `instance/vault/`, а не в SQLite. `sha256` — хеш
+**відкритого** тексту для додаткової перевірки після GCM-дешифрування.
 
 ---
 
@@ -697,6 +770,61 @@ URL-декодування та NFKC-нормалізації. Сигнатур�
 потрібно закрити авторизацією або вимкнути (`WAF_LAB_ALLOW_RESET=0`,
 окремий admin-маршрут).
 
+### 7.17. AES-256-GCM і формат контейнера (ЛР №5)
+
+```python
+ct_and_tag = AESGCM(key).encrypt(nonce, plaintext, aad)
+ciphertext, tag = ct_and_tag[:-16], ct_and_tag[-16:]
+container = nonce + tag + ciphertext          # [12 B][16 B][N B]
+```
+
+- `nonce = os.urandom(12)` — новий 96-бітний IV для кожного файлу;
+- `tag` — 16-байтний Authentication Tag, який перевіряється **до**
+  повернення plaintext;
+- `AAD = b"docvault|file|v1|<document_id>|<owner_id>"` — прив'язує
+  контейнер до метаданих і власника;
+- неправильний ключ, IV, tag, ciphertext або AAD → `InvalidTag`.
+
+### 7.18. Завантаження та скачування (ЛР №5)
+
+`POST /api/v1/documents/upload`:
+
+1. JWT Bearer, перевірка активної сесії;
+2. санітизація імені, allowlist розширень, ліміт `MAX_DOCUMENT_BYTES`;
+3. `uuid.uuid4()` для `document_id` і `<uuid>.enc`;
+4. AES-GCM-шифрування, атомарний `os.replace()`;
+5. запис метаданих у SQLite; при помилці БД файл видаляється.
+
+`GET /api/v1/documents/<id>/download`:
+
+1. перевірка власника або ролі `admin` (IDOR захист);
+2. читання `.enc`, відновлення AAD із метаданих;
+3. `AESGCM.decrypt()` → `InvalidTag` → `409 integrity_error`;
+4. додаткова перевірка SHA-256 plaintext;
+5. `send_file(..., as_attachment=True)` із `X-Content-SHA256`.
+
+### 7.19. Керування ключем і ротація (ЛР №5)
+
+- `FILE_ENCRYPTION_KEY` — 32-байтний AES-256 ключ у hex (64 символи);
+- у production `FILE_ENCRYPTION_KEY_REQUIRED=1` — старт без ключа
+  завершується помилкою;
+- `FILE_ENCRYPTION_KEY_OLD` — список старих ключів через кому; сервіс
+  пробує поточний, потім старі (ротація без втрати старих файлів);
+- відбиток ключа (`SHA-256` перші 16 hex) показується в UI, але сам
+  ключ ніколи не логується й не віддається клієнту;
+- ключ зберігається окремо від диска з файлами (env/секрет-менеджер).
+
+### 7.20. Цілісність і IDOR (ЛР №5)
+
+- `InvalidTag` при зміні одного байта IV/tag/ciphertext;
+- SHA-256 plaintext у БД — друга незалежна перевірка;
+- UUID4 + перевірка `owner_id`/`admin` замість прямих ID;
+- AAD не дає переставити контейнер між документами або власниками;
+- `X-Content-Type-Options: nosniff` + `Content-Disposition: attachment`
+  для скачування;
+- HTML/JS/SVG-розширення не входять до allowlist, щоб сховище не стало
+  XSS-репозиторієм.
+
 ---
 
 ## 8. Приклади запитів до API
@@ -783,7 +911,7 @@ python -m unittest discover -v
 **Результат на момент здачі:**
 
 ```text
-Ran 172 tests in 51.3s
+Ran 213 tests in 56.0s
 OK
 ```
 
@@ -802,6 +930,9 @@ OK
 | `test_waf_filter.py` | 33 | Path Traversal, SQLi, command injection, XSS, false positives, Greylist |
 | `test_network_security.py` | 18 | 401→429, 403, Greylist, журнал, CSRF Reset, виключення лабів |
 | `test_network_security_e2e.py` | 6 | реальний браузерний стрес-тест, WAF-атаки, Greylist, Reset |
+| `test_file_crypto.py` | 20 | IV, Tag, roundtrip, tamper, AAD, key rotation, короткий контейнер |
+| `test_documents.py` | 17 | upload/download, IDOR, admin, 409 InvalidTag, валідація, UI |
+| `test_documents_e2e.py` | 4 | UI upload, detail/hexdump, заборонене розширення, delete |
 
 Окремі групи:
 
@@ -815,6 +946,8 @@ python -m unittest tests.test_client_security_e2e -v
 python -m unittest tests.test_rate_limiter tests.test_waf_filter -v
 python -m unittest tests.test_network_security -v
 python -m unittest tests.test_network_security_e2e -v
+python -m unittest tests.test_file_crypto tests.test_documents -v
+python -m unittest tests.test_documents_e2e -v
 ```
 
 ### Ручна перевірка JWT-протоколу
@@ -863,9 +996,47 @@ python -m unittest tests.test_network_security_e2e -v
 7. Для термінального протоколу:
    `python scripts/stress_test_lab4.py --base-url http://127.0.0.1:5000`.
 
+### Ручна перевірка шифрування файлів
+
+1. Запустіть `python run.py`, увійдіть і відкрийте `/vault`.
+2. Завантажте `.txt`/`.pdf` — відкриється detail-сторінка з IV, Tag,
+   Ciphertext і hexdump.
+3. Перевірте диск: `instance/vault/<uuid>.enc` не містить plaintext.
+4. Натисніть **«Розшифрувати та скачати»** — файл повертається з
+   `X-Content-SHA256`.
+5. Для API-протоколу:
+   `python scripts/demo_lab5_api.py --base-url http://127.0.0.1:5000`
+   (потрібен користувач `lab5.demo` або змініть `--username/--password`).
+6. Для тесту цілісності:
+   `python scripts/integrity_test_lab5.py --mode all`.
+
 ---
 
 ## 10. Скриншоти та звіт
+
+### ЛР №5 — `docs/screenshots 5/`
+
+Автоматично згенерувати всі скриншоти:
+
+```bash
+python scripts/capture_screenshots_lab5.py
+```
+
+Скрипт піднімає сервер, виконує реальний API-протокол, запускає
+integrity-тест із hexdump та проходить UI Cipher Vault в Edge headless.
+
+| Файл | Що демонструє |
+|---|---|
+| `00-vault-overview.png` | оглядова сторінка `/vault`, статус AES-256-GCM |
+| `01-api-upload-download.png` | login → upload 201 → metadata → download 200, SHA-256 match |
+| `02-stored-container-hexdump.png` | hexdump `.enc`-файлу, plaintext marker: ABSENT |
+| `03-integrity-invalidtag.png` | зміна 1 байта → `InvalidTag` → `409 integrity_error` |
+| `04-vault-upload-detail.png` | UI-завантаження, IV/Tag/Ciphertext і hexdump |
+| `05-vault-documents.png` | список зашифрованих документів |
+| `06-file-encryption-architecture.png` | схема контейнера, AEAD і потоків |
+
+Додатковий матеріал: `docs/file_encryption_architecture.html` — схема
+AES-GCM, порівняння ECB/CBC/CTR/GCM і модель загроз.
 
 ### ЛР №4 — `docs/screenshots 4/`
 
@@ -989,6 +1160,7 @@ git tag
 # v0.2-jwt-api
 # v0.3-client-security
 # v0.4-waf-ratelimit
+# v0.5-file-encryption
 ```
 
 Перевірити історію:
@@ -1027,6 +1199,13 @@ python scripts/capture_screenshots_lab4.py
 # стрес-тест WAF / Rate Limiting (10 запитів)
 python scripts/stress_test_lab4.py --base-url http://127.0.0.1:5000
 
+# скриншоти ЛР №5
+python scripts/capture_screenshots_lab5.py
+
+# API-протокол і integrity-тест AES-GCM
+python scripts/demo_lab5_api.py --base-url http://127.0.0.1:5000
+python scripts/integrity_test_lab5.py --mode all
+
 # перевірити health-check
 http://127.0.0.1:5000/healthz
 http://127.0.0.1:5000/api/v1/health
@@ -1045,7 +1224,10 @@ http://127.0.0.1:5000/api/v1/health
   закрити авторизацією або вимкнути (`WAF_LAB_ALLOW_RESET=0`);
 - WAF навмисно виключає `/client-lab` і `/security-lab`, щоб зберегти
   демонстрації ЛР №1 та ЛР №3;
-- немає шифрування файлів — ЛР №5;
+- ключ AES-256 зберігається в env для навчального стенда; у production
+  потрібен KMS/HSM/secret manager, аудит доступу та планова ротація;
+- файли читаються в пам'ять повністю (ліміт 5 МБ); для великих файлів
+  потрібне потокове/chunked-шифрування;
 - немає цифрових підписів — ЛР №6;
 - JWT зберігаються на клієнті в пам'яті стенда; у production-фронтенді
   Refresh-токен варто тримати в `HttpOnly Secure SameSite=Strict` cookie;
@@ -1096,6 +1278,26 @@ False Positives.
 
 ---
 
-## 16. Ліцензія
+## 16. Висновок до ЛР №5
+
+Шифрування файлів у Secure DocVault реалізовано як AES-256-GCM із
+контейнером `[12 B IV][16 B Tag][Ciphertext]`, унікальним
+`os.urandom(12)` для кожного файлу та AAD, що прив'язує контейнер до
+UUID документа й власника. Завантаження шифрує дані до запису на диск,
+метадані та SHA-256 plaintext зберігаються окремо в SQLite, а скачування
+перевіряє права owner/admin, GCM tag і хеш; зміна одного байта IV, tag
+або ciphertext викликає `InvalidTag` і `409 integrity_error`, не
+повертаючи жодного байта plaintext. Такий підхід забезпечує
+конфіденційність навіть при викраденні диска/бекапу та цілісність при
+пошкодженні чи підміні файлу, а UUID4 і перевірка власника закривають
+IDOR. Водночас ключ потребує окремого захищеного зберігання й ротації
+(`FILE_ENCRYPTION_KEY_OLD`), а для великих файлів у production варто
+перейти на потокове шифрування; тести (20 unit crypto, 17 інтеграційних
+і 4 Selenium E2E) підтверджують roundtrip, унікальність IV, виявлення
+модифікацій, IDOR і коректну роботу UI.
+
+---
+
+## 17. Ліцензія
 
 Навчальний проєкт. Використовуйте лише для освітніх цілей.
