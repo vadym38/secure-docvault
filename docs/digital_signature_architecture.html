@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Secure DocVault · Sigil / RSA-PSS (ЛР №6)</title>
+<style>
+  :root {
+    --bg: #05080b;
+    --panel: #0c141b;
+    --line: rgba(151, 193, 208, 0.16);
+    --text: #e9f3f3;
+    --muted: #8aa1a9;
+    --muted-2: #647a83;
+    --mint: #72f2c6;
+    --blue: #7ab8ff;
+    --violet: #b49cff;
+    --gold: #ffd07a;
+    --rose: #ff7c91;
+    --mono: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+    --display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; padding: 42px 48px 54px;
+    color: var(--text); font-family: var(--display);
+    background:
+      radial-gradient(950px 540px at 84% -10%, rgba(180, 156, 255, 0.15), transparent 62%),
+      radial-gradient(820px 480px at 2% 10%, rgba(255, 208, 122, 0.08), transparent 58%),
+      var(--bg);
+  }
+  header { max-width: 1340px; margin: 0 auto 26px; }
+  .eyebrow {
+    display: flex; align-items: center; gap: 9px; margin: 0 0 12px;
+    color: var(--violet); font-family: var(--mono); font-size: 12px;
+    letter-spacing: 0.16em; text-transform: uppercase;
+  }
+  .pulse {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--violet);
+    box-shadow: 0 0 0 5px rgba(180, 156, 255, 0.15);
+  }
+  h1 { margin: 0; max-width: 1100px; font-size: 46px; line-height: 1.02; letter-spacing: -0.045em; }
+  .grad {
+    background: linear-gradient(100deg, var(--violet), #d9ccff 45%, var(--gold));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .lede { max-width: 1050px; margin: 16px 0 0; color: #c3d4d8; font-size: 15px; line-height: 1.6; }
+
+  .flow {
+    display: grid; grid-template-columns: 1fr 40px 1fr 40px 1fr 40px 1fr;
+    align-items: stretch; max-width: 1340px; margin: 0 auto 22px;
+  }
+  .step {
+    position: relative; padding: 20px 17px 18px;
+    border: 1px solid var(--line); border-radius: 16px;
+    background: linear-gradient(160deg, rgba(255,255,255,0.045), rgba(255,255,255,0.008));
+  }
+  .step__num {
+    position: absolute; top: -12px; left: 15px; padding: 3px 9px;
+    border-radius: 999px; color: #160b28; background: linear-gradient(135deg, var(--violet), #d9ccff);
+    font-family: var(--mono); font-size: 10px; font-weight: 700;
+  }
+  .step h2 { margin: 6px 0 8px; font-size: 16px; letter-spacing: -0.02em; }
+  .step p { margin: 0; color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+  .step code { color: var(--violet); font-family: var(--mono); font-size: 10.6px; }
+  .step--doc { border-color: rgba(122,184,255,.3); }
+  .step--hash { border-color: rgba(114,242,198,.3); }
+  .step--sign { border-color: rgba(180,156,255,.4); }
+  .step--verify { border-color: rgba(255,208,122,.3); }
+  .arrow { display: grid; place-items: center; color: var(--muted-2); font-size: 18px; }
+
+  .grid {
+    display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 18px;
+    max-width: 1340px; margin: 0 auto 20px;
+  }
+  .panel {
+    padding: 21px; border: 1px solid var(--line); border-radius: 17px;
+    background: linear-gradient(160deg, rgba(255,255,255,0.035), rgba(255,255,255,0.008));
+  }
+  .panel h2 { margin: 0 0 13px; font-size: 16px; }
+  table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  th, td { padding: 8px 9px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { color: var(--muted); font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; }
+  td { color: #c3d4d8; line-height: 1.45; }
+  tr:last-child td { border-bottom: 0; }
+  td code { color: var(--gold); font-family: var(--mono); font-size: 10.5px; }
+  .pill { display: inline-flex; padding: 3px 8px; border-radius: 999px; font-family: var(--mono); font-size: 10px; }
+  .pill--ok { color: var(--mint); background: rgba(114,242,198,.1); border: 1px solid rgba(114,242,198,.3); }
+  .pill--warn { color: var(--gold); background: rgba(255,208,122,.1); border: 1px solid rgba(255,208,122,.3); }
+  .pill--bad { color: var(--rose); background: rgba(255,124,145,.1); border: 1px solid rgba(255,124,145,.3); }
+
+  .keyfacts { display: grid; gap: 0; }
+  .keyfacts > div {
+    display: grid; grid-template-columns: 150px minmax(0, 1fr);
+    gap: 12px; padding: 9px 0; border-top: 1px solid var(--line);
+  }
+  .keyfacts > div:first-child { border-top: 0; }
+  .keyfacts dt { color: var(--muted); font-family: var(--mono); font-size: 10.5px; }
+  .keyfacts dd { margin: 0; color: #c3d4d8; font-size: 11.5px; line-height: 1.5; }
+  .keyfacts code { color: var(--violet); font-family: var(--mono); }
+
+  .keystrip {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px;
+  }
+  .keystrip article {
+    padding: 13px; border: 1px solid var(--line); border-radius: 12px;
+    background: rgba(4,8,11,0.35);
+  }
+  .keystrip strong { display: block; color: var(--text); font-size: 12px; margin-bottom: 4px; }
+  .keystrip span { color: var(--muted); font-size: 10.8px; line-height: 1.45; }
+  .keystrip code { color: var(--gold); font-family: var(--mono); font-size: 10.3px; }
+
+  .footer {
+    max-width: 1340px; margin: 0 auto; padding: 18px 22px;
+    border: 1px solid rgba(180,156,255,0.24); border-radius: 17px;
+    background: rgba(180,156,255,0.055);
+    color: #c3d4d8; font-size: 12.5px; line-height: 1.55;
+  }
+  .footer strong { color: var(--violet); }
+</style>
+</head>
+<body>
+  <header>
+    <p class="eyebrow"><span class="pulse"></span> Sigil / asymmetric signature</p>
+    <h1>Підпис, який <span class="grad">переживе копіювання файлу.</span></h1>
+    <p class="lede">
+      Приватний ключ RSA-2048 підписує SHA-256-дайджест документа; відкритий
+      ключ дозволяє перевірити авторство, не розкриваючи приватний ключ.
+      Навіть якщо файл скопіювати, змінити один байт або підмінити підпис,
+      перевірка поверне <code>False</code> / <code>InvalidSignature</code>.
+    </p>
+  </header>
+
+  <section class="flow" aria-label="Процес ЕЦП">
+    <article class="step step--doc"><span class="step__num">01 · DOCUMENT</span><h2>Документ</h2><p>Відкритий текст після AES-GCM-дешифрування; байт-у-байт.</p></article>
+    <div class="arrow">→</div>
+    <article class="step step--hash"><span class="step__num">02 · SHA-256</span><h2>Дайджест</h2><p>32 байти. Підписується саме хеш, а не весь файл.</p></article>
+    <div class="arrow">→</div>
+    <article class="step step--sign"><span class="step__num">03 · RSA-PSS</span><h2>Приватний ключ</h2><p>MGF1-SHA256, salt = MAX_LENGTH. 256-байтний підпис.</p></article>
+    <div class="arrow">→</div>
+    <article class="step step--verify"><span class="step__num">04 · VERIFY</span><h2>Відкритий ключ</h2><p>Перевірка підпису + SHA-256. Невдача → відмова у видачі.</p></article>
+  </section>
+
+  <section class="grid">
+    <div class="panel">
+      <h2>Життєвий цикл ключа</h2>
+      <div class="keyfacts">
+        <div><dt>Генерація</dt><dd>RSA-2048, public exponent <code>65537</code>, локально на сервері.</dd></div>
+        <div><dt>Приватний ключ</dt><dd>PKCS#8 PEM, <code>BestAvailableEncryption(passphrase)</code>; парольна фраза не зберігається.</dd></div>
+        <div><dt>Відкритий ключ</dt><dd>X.509 SubjectPublicKeyInfo PEM; fingerprint = SHA-256(SPKI DER).</dd></div>
+        <div><dt>Зберігання</dt><dd>таблиця <code>user_signing_keys</code>: public PEM, encrypted private PEM, fingerprint.</dd></div>
+        <div><dt>Ротація</dt><dd>новий ключ стає active; старі ключі лишаються для перевірки старих підписів.</dd></div>
+      </div>
+      <div class="keystrip">
+        <article><strong>Public PEM</strong><span>Можна публікувати. Використовується для <code>verify</code>.</span></article>
+        <article><strong>Private PEM</strong><span>Лише encrypted. Без passphrase — непридатний.</span></article>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Чому не HMAC</h2>
+      <table>
+        <thead><tr><th>Властивість</th><th>HMAC</th><th>ЕЦП</th></tr></thead>
+        <tbody>
+          <tr><td>Секрет</td><td>спільний</td><td>приватний/відкритий</td></tr>
+          <tr><td>Авторство</td><td>будь-хто з ключем</td><td>лише власник private</td></tr>
+          <tr><td>Non-repudiation</td><td><span class="pill pill--bad">ні</span></td><td><span class="pill pill--ok">так</span></td></tr>
+          <tr><td>Перевірка третьою стороною</td><td>потрібен секрет</td><td>достатньо public</td></tr>
+        </tbody>
+      </table>
+      <p class="keyfacts" style="margin-top:12px">
+        <span style="color:var(--muted);font-size:11.5px">
+          RSA-PSS є ймовірнісною схемою: два підписи одного файлу різні,
+          що ускладнює атаки та дає кращий доказ безпеки, ніж
+          детермінований PKCS#1 v1.5.
+        </span>
+      </p>
+    </div>
+  </section>
+
+  <section class="panel" style="max-width:1340px;margin:0 auto 20px">
+    <h2>Що саме перевіряє Secure DocVault</h2>
+    <table>
+      <thead><tr><th>Крок</th><th>Перевірка</th><th>Результат</th></tr></thead>
+      <tbody>
+        <tr><td>Download</td><td>AES-GCM tag + SHA-256 plaintext</td><td>пошкоджений контейнер → <code>409</code></td></tr>
+        <tr><td>Signature</td><td>RSA-PSS verify(digest, signature, public_key)</td><td>підробка → <code>409 signature_invalid</code></td></tr>
+        <tr><td>Metadata</td><td>signer_id, key_id, algorithm, signed_at, verified_at</td><td>Signed &amp; Verified</td></tr>
+        <tr><td>Access</td><td>owner/admin + UUID4</td><td>IDOR → <code>403</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <div class="footer">
+    <strong>Висновок:</strong> ЕЦП додає до конфіденційності AES-GCM ще й
+    авторську цілісність і неспростовність. RSA-PSS + SHA-256 + encrypted
+    PKCS#8 дають практичний баланс для навчального проєкту; у production
+    відкриті ключі слід закріпити сертифікатами X.509/PKI, а приватні —
+    зберігати в HSM/KMS із двофакторним доступом.
+  </div>
+</body>
+</html>

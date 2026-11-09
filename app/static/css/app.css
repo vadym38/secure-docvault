@@ -3964,3 +3964,521 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/* --------------------------------------------------------------------------
+   Sigil — ЕЦП RSA-PSS та ключі підпису (ЛР №6)
+   -------------------------------------------------------------------------- */
+
+.sigil-page {
+  background:
+    radial-gradient(980px 560px at 82% -10%, rgba(180, 156, 255, 0.13), transparent 60%),
+    radial-gradient(820px 500px at 4% 8%, rgba(255, 208, 122, 0.08), transparent 58%),
+    var(--bg);
+}
+
+.sigil-shell {
+  position: relative;
+  z-index: 1;
+  width: min(1320px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 30px 0 76px;
+}
+
+.sigil-hero {
+  max-width: 1040px;
+  margin-bottom: 24px;
+}
+
+.sigil-hero h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 4.5vw, 4rem);
+  font-weight: 700;
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+}
+
+.sigil-hero .lede {
+  max-width: 940px;
+  margin: 18px 0 0;
+  color: var(--text-soft);
+  font-size: 0.92rem;
+  line-height: 1.65;
+}
+
+.sigil-hero .lede code {
+  color: var(--violet, #b49cff);
+}
+
+.grad--violet {
+  background: linear-gradient(100deg, #b49cff 0%, #d9ccff 44%, #ffd07a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.pulse-dot--violet {
+  background: #b49cff;
+  box-shadow: 0 0 0 4px rgba(180, 156, 255, 0.15);
+}
+
+.badge--violet {
+  color: #b49cff;
+  border-color: rgba(180, 156, 255, 0.34);
+  background: rgba(180, 156, 255, 0.08);
+}
+
+.badge--gold {
+  color: #ffd07a;
+  border-color: rgba(255, 208, 122, 0.34);
+  background: rgba(255, 208, 122, 0.08);
+}
+
+/* --- Статусні картки ---------------------------------------------------- */
+
+.sigil-status {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.sigil-stat {
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.008));
+}
+
+.sigil-stat__label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sigil-stat strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.16rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.sigil-stat small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  line-height: 1.45;
+}
+
+.sigil-stat--violet { border-color: rgba(180, 156, 255, 0.3); }
+.sigil-stat--violet strong { color: #b49cff; }
+.sigil-stat--gold { border-color: rgba(255, 208, 122, 0.28); }
+.sigil-stat--gold strong { color: #ffd07a; }
+.sigil-stat--mint { border-color: rgba(114, 242, 198, 0.26); }
+.sigil-stat--mint strong { color: var(--mint); }
+.sigil-stat--rose { border-color: rgba(255, 124, 145, 0.28); }
+.sigil-stat--rose strong { color: var(--rose); }
+
+/* --- Сітки -------------------------------------------------------------- */
+
+.sigil-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 18px;
+}
+
+.sigil-panel {
+  margin-bottom: 18px;
+}
+
+/* --- Форми -------------------------------------------------------------- */
+
+.sigil-form {
+  display: grid;
+  gap: 11px;
+  margin-top: 12px;
+}
+
+.sigil-form .field {
+  display: grid;
+  gap: 6px;
+}
+
+.sigil-form .field > span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sigil-form input[type="password"] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--text);
+  background: rgba(4, 8, 11, 0.5);
+  font-size: 0.78rem;
+}
+
+.sigil-form input:focus {
+  outline: none;
+  border-color: rgba(180, 156, 255, 0.55);
+  box-shadow: 0 0 0 3px rgba(180, 156, 255, 0.08);
+}
+
+.sigil-form--inline {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.sigil-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 18px 20px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+
+.sigil-empty h3 {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+}
+
+.sigil-empty p {
+  max-width: 420px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.sigil-rotate {
+  margin-top: 13px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.sigil-rotate summary {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  cursor: pointer;
+}
+
+.sigil-rotate summary:hover {
+  color: var(--violet, #b49cff);
+}
+
+/* --- PEM ---------------------------------------------------------------- */
+
+.pem-block {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(4, 8, 11, 0.38);
+  overflow: hidden;
+}
+
+.pem-block summary {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.pem-block pre {
+  margin: 0;
+  padding: 12px;
+  max-height: 260px;
+  overflow: auto;
+  color: var(--text-soft);
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  line-height: 1.5;
+  white-space: pre;
+}
+
+.pem-block--private summary {
+  color: #ffd07a;
+}
+
+.pem-block--private pre {
+  color: #c9bfe8;
+}
+
+.pem-block .btn {
+  margin: 0 12px 12px;
+}
+
+.pem-warning {
+  margin: 0 12px 10px;
+  color: var(--amber);
+  font-size: 0.66rem;
+  line-height: 1.45;
+}
+
+/* --- Потік -------------------------------------------------------------- */
+
+.sigil-flow {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.sigil-flow article {
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.sigil-flow__num {
+  display: inline-block;
+  margin-bottom: 7px;
+  color: #b49cff;
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+}
+
+.sigil-flow h3 {
+  margin: 0 0 4px;
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.sigil-flow p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.sigil-flow__arrow {
+  color: #b49cff;
+  font-size: 1rem;
+}
+
+/* --- Факти -------------------------------------------------------------- */
+
+.sigil-facts {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.sigil-facts > div {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: 12px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+}
+
+.sigil-facts > div:first-child {
+  border-top: 0;
+}
+
+.sigil-facts dt {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  line-height: 1.45;
+}
+
+.sigil-facts dd {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.7rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.sigil-facts code {
+  color: #b49cff;
+}
+
+.sigil-fingerprint {
+  color: #ffd07a;
+}
+
+.sigil-hash {
+  color: var(--mint);
+  overflow-wrap: anywhere;
+}
+
+/* --- Таблиця підписів --------------------------------------------------- */
+
+.sigil-table td {
+  vertical-align: middle;
+}
+
+.sigil-file {
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.sigil-file:hover {
+  color: #b49cff;
+}
+
+/* --- Бейджі підпису ----------------------------------------------------- */
+
+.signature-badge {
+  display: inline-flex;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.signature-badge--unsigned {
+  color: var(--muted);
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.signature-badge--signed {
+  color: var(--amber);
+  border-color: rgba(255, 184, 107, 0.34);
+  background: rgba(255, 184, 107, 0.08);
+}
+
+.signature-badge--verified {
+  color: var(--mint);
+  border-color: rgba(114, 242, 198, 0.36);
+  background: rgba(114, 242, 198, 0.09);
+}
+
+.signature-badge--invalid {
+  color: var(--rose);
+  border-color: rgba(255, 124, 145, 0.36);
+  background: rgba(255, 124, 145, 0.09);
+}
+
+/* --- Панель підпису у vault --------------------------------------------- */
+
+.signature-panel {
+  margin-bottom: 18px;
+}
+
+.signature-invalid {
+  padding: 14px;
+  border: 1px solid rgba(255, 124, 145, 0.32);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 124, 145, 0.06);
+}
+
+.signature-invalid strong {
+  color: var(--rose);
+  font-size: 0.82rem;
+}
+
+.signature-invalid p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.sigil-callout {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(180, 156, 255, 0.24);
+  border-radius: var(--radius-sm);
+  background: rgba(180, 156, 255, 0.05);
+}
+
+.sigil-callout > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.sigil-callout strong {
+  display: block;
+  color: var(--text);
+  font-size: 0.8rem;
+  margin-bottom: 3px;
+}
+
+.sigil-callout p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+/* --- Адаптивність ------------------------------------------------------- */
+
+@media (max-width: 1080px) {
+  .sigil-status {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sigil-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sigil-flow {
+    grid-template-columns: 1fr;
+  }
+
+  .sigil-flow__arrow {
+    justify-self: center;
+    transform: rotate(90deg);
+  }
+}
+
+@media (max-width: 760px) {
+  .sigil-shell {
+    width: min(100% - 32px, 1320px);
+  }
+
+  .sigil-status {
+    grid-template-columns: 1fr;
+  }
+
+  .sigil-form--inline {
+    grid-template-columns: 1fr;
+  }
+
+  .sigil-facts > div {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+
+  .sigil-callout {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+}

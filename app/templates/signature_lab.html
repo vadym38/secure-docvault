@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+
+{% block body_class %}sigil-page{% endblock %}
+{% block title %}Sigil · ЕЦП і ключі підпису{% endblock %}
+
+{% block content %}
+<main class="sigil-shell">
+  <header class="lab-head">
+    {% include "_brand.html" %}
+    <nav class="api-head-actions" aria-label="Навігація">
+      <a class="btn btn--ghost" href="{{ url_for('vault.index') }}">Сховище</a>
+      <a class="btn btn--ghost" href="{{ url_for('network.lab_index') }}">WAF</a>
+      <a class="btn btn--ghost" href="{{ url_for('auth.dashboard') }}">Кабінет</a>
+      <a class="btn btn--ghost" href="{{ url_for('auth.index') }}">
+        {{ icon('arrow', 'icon--back') }}<span>Назад</span>
+      </a>
+    </nav>
+  </header>
+
+  <section class="sigil-hero">
+    <p class="eyebrow"><span class="pulse-dot pulse-dot--violet"></span> Sigil / RSA-PSS 2048 · SHA-256</p>
+    <h1>Підпис, який <span class="grad grad--violet">неможливо підробити.</span></h1>
+    <p class="lede">
+      Приватний ключ захищений парольною фразою у PKCS#8 PEM. Документ
+      хешується SHA-256, підписується RSA-PSS і зберігається разом із
+      метаданими. Відкритий ключ X.509 дозволяє будь-кому перевірити
+      авторство, не маючи приватного ключа.
+    </p>
+  </section>
+
+  <section class="sigil-status">
+    <article class="sigil-stat sigil-stat--violet">
+      <span class="sigil-stat__label">Алгоритм</span>
+      <strong>RSA-PSS 2048</strong>
+      <small>MGF1-SHA256 · salt = MAX_LENGTH</small>
+    </article>
+    <article class="sigil-stat sigil-stat--gold">
+      <span class="sigil-stat__label">Активний ключ</span>
+      <strong class="mono">{{ stats.fingerprint[:16] if stats.fingerprint else "—" }}</strong>
+      <small>{{ stats["keys"] }} ключ(ів) · fingerprint SHA-256</small>
+    </article>
+    <article class="sigil-stat sigil-stat--mint">
+      <span class="sigil-stat__label">Підписи</span>
+      <strong>{{ stats.signatures }}</strong>
+      <small>{{ stats.verified }} verified · {{ stats.invalid }} invalid</small>
+    </article>
+    <article class="sigil-stat sigil-stat--rose">
+      <span class="sigil-stat__label">Non-repudiation</span>
+      <strong>Proof</strong>
+      <small>автор не може відмовитися від підпису</small>
+    </article>
+  </section>
+
+  <div class="sigil-grid">
+    <section class="panel sigil-panel" id="signature-key-panel">
+      <div class="panel__head">
+        <h2>Ключ підпису</h2>
+        {% if active_key %}
+          <span class="badge badge--violet">active</span>
+        {% else %}
+          <span class="badge badge--bad">немає ключа</span>
+        {% endif %}
+      </div>
+
+      {% if active_key %}
+        <dl class="sigil-facts">
+          <div><dt>Key ID</dt><dd class="mono">{{ active_key.key_id }}</dd></div>
+          <div><dt>Fingerprint</dt><dd class="mono sigil-fingerprint">{{ active_key.fingerprint }}</dd></div>
+          <div><dt>Створено</dt><dd class="mono">{{ active_key.created_at }}</dd></div>
+          <div><dt>Формат</dt><dd class="mono">PKCS#8 encrypted · X.509 SPKI</dd></div>
+        </dl>
+
+        <details class="pem-block" open>
+          <summary>Відкритий ключ · X.509 PEM</summary>
+          <pre>{{ active_key.public_key_pem }}</pre>
+          <a class="btn btn--ghost btn--small" href="{{ url_for('signature.export_public', key_id=active_key.key_id) }}">Завантажити public.pem</a>
+        </details>
+
+        <details class="pem-block pem-block--private" open>
+          <summary>Приватний ключ · PKCS#8 PEM (зашифровано)</summary>
+          <pre>{{ private_pem }}</pre>
+          <p class="pem-warning">
+            Це зашифрований PEM. Парольна фраза не зберігається на сервері;
+            без неї ключ непридатний.
+          </p>
+          <a class="btn btn--ghost btn--small" href="{{ url_for('signature.export_private', key_id=active_key.key_id) }}">Завантажити private-encrypted.pem</a>
+        </details>
+
+        <details class="sigil-rotate">
+          <summary>Згенерувати новий ключ (ротація)</summary>
+          <form method="post" action="{{ url_for('signature.generate') }}" class="sigil-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label class="field">
+              <span>Нова парольна фраза</span>
+              <input type="password" name="passphrase" minlength="{{ min_passphrase }}" required autocomplete="new-password">
+            </label>
+            <label class="field">
+              <span>Підтвердження</span>
+              <input type="password" name="confirm" minlength="{{ min_passphrase }}" required autocomplete="new-password">
+            </label>
+            <button class="btn btn--secondary btn--small" type="submit">Згенерувати новий ключ</button>
+          </form>
+          <p class="api-note">Старі підписи залишаються перевірними: їхні відкриті ключі зберігаються.</p>
+        </details>
+      {% else %}
+        <div class="sigil-empty">
+          <span class="icon-tile">{{ icon('key') }}</span>
+          <h3>Створіть ключ підпису</h3>
+          <p>
+            Ключ RSA-2048 генерується локально на сервері. Приватна частина
+            одразу шифрується PKCS#8 парольною фразою; відкрита — X.509 PEM.
+          </p>
+        </div>
+        <form method="post" action="{{ url_for('signature.generate') }}" class="sigil-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label class="field">
+            <span>Парольна фраза (мін. {{ min_passphrase }} символів)</span>
+            <input type="password" name="passphrase" minlength="{{ min_passphrase }}" required autocomplete="new-password">
+          </label>
+          <label class="field">
+            <span>Підтвердження</span>
+            <input type="password" name="confirm" minlength="{{ min_passphrase }}" required autocomplete="new-password">
+          </label>
+          <button class="btn btn--primary btn--wide" type="submit">
+            {{ icon('key') }}<span>Згенерувати RSA-PSS ключ</span>
+          </button>
+        </form>
+      {% endif %}
+    </section>
+
+    <section class="panel sigil-panel">
+      <div class="panel__head">
+        <h2>Як працює ЕЦП</h2>
+        <span class="badge badge--ok">AEAD + signature</span>
+      </div>
+      <div class="sigil-flow">
+        <article>
+          <span class="sigil-flow__num">01</span>
+          <h3>SHA-256</h3>
+          <p>Відкритий текст документа перетворюється на 32-байтний дайджест.</p>
+        </article>
+        <span class="sigil-flow__arrow">→</span>
+        <article>
+          <span class="sigil-flow__num">02</span>
+          <h3>RSA-PSS sign</h3>
+          <p>Приватний ключ підписує дайджест із випадковою сіллю PSS.</p>
+        </article>
+        <span class="sigil-flow__arrow">→</span>
+        <article>
+          <span class="sigil-flow__num">03</span>
+          <h3>Verify</h3>
+          <p>Відкритий ключ перевіряє підпис; зміна байта → InvalidSignature.</p>
+        </article>
+      </div>
+      <dl class="sigil-facts">
+        <div><dt>HMAC vs ЕЦП</dt><dd>HMAC має спільний секрет; ЕЦП — асиметричний, тому забезпечує non-repudiation.</dd></div>
+        <div><dt>PSS vs PKCS#1 v1.5</dt><dd>PSS імовірнісний: різні підписи для одного документа, кращий доказ безпеки.</dd></div>
+        <div><dt>Приватний ключ</dt><dd>Ніколи не залишає сервер у відкритому вигляді; експорт — лише encrypted PEM.</dd></div>
+      </dl>
+    </section>
+  </div>
+
+  <section class="panel sigil-panel">
+    <div class="panel__head">
+      <h2>Підписані документи</h2>
+      <span class="badge">{{ signatures|length }} записів</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table sigil-table">
+        <thead>
+          <tr><th>Документ</th><th>Підписант</th><th>Алгоритм</th><th>SHA-256</th><th>Підписано</th><th>Статус</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for item in signatures %}
+            <tr>
+              <td><a class="sigil-file" href="{{ url_for('vault.document_detail', doc_id=item.document_id) }}">{{ item.original_filename }}</a></td>
+              <td class="mono">{{ current_user.username if current_user else "—" }}</td>
+              <td class="mono">{{ item.algorithm }}</td>
+              <td class="mono sigil-hash">{{ item.document_sha256[:16] }}…</td>
+              <td class="mono">{{ item.signed_at }}</td>
+              <td>
+                <span class="signature-badge signature-badge--{{ item.status }}">
+                  {{ "Signed & Verified" if item.status == "verified" else ("Invalid" if item.status == "invalid" else "Signed") }}
+                </span>
+              </td>
+              <td><a class="btn btn--ghost btn--small" href="{{ url_for('vault.document_detail', doc_id=item.document_id) }}">Деталі</a></td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7" class="empty-cell">Підписів ще немає. Завантажте документ у сховище та підпишіть його.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="api-note">
+      Таблиця <code>document_signatures</code>: document_id, signer_id,
+      key_id, algorithm, document_sha256, signature_b64, signed_at,
+      verified_at, status. Приватний ключ у БД лише encrypted PKCS#8 PEM.
+    </p>
+  </section>
+
+  <section class="panel sigil-panel">
+    <div class="panel__head">
+      <h2>Історія ключів</h2>
+      <span class="badge">{{ keys|length }} ключів</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table sigil-table">
+        <thead><tr><th>Key ID</th><th>Fingerprint</th><th>Алгоритм</th><th>Створено</th><th>Стан</th></tr></thead>
+        <tbody>
+          {% for key in keys %}
+            <tr>
+              <td class="mono">{{ key.key_id }}</td>
+              <td class="mono sigil-hash">{{ key.fingerprint }}</td>
+              <td class="mono">{{ key.algorithm }}</td>
+              <td class="mono">{{ key.created_at }}</td>
+              <td><span class="flag {{ 'flag--ok' if key.is_active else 'flag--off' }}">{{ "active" if key.is_active else "retired" }}</span></td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5" class="empty-cell">Ключів ще немає.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+{% endblock %}

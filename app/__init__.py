@@ -13,9 +13,11 @@ from .documents import DocumentService
 from .documents_api import documents_api_bp
 from .file_crypto import initialize_file_cipher
 from .jwt_service import MIN_SECRET_BYTES
+from .keys_api import keys_api_bp
 from .network_guard import install_network_middleware
 from .network_lab import network_bp
 from .security import install_security_middleware
+from .signature_lab import signature_bp
 from .vault import vault_bp
 
 
@@ -61,7 +63,9 @@ def create_app(config_object: type = Config) -> Flask:
     app.register_blueprint(client_bp)
     app.register_blueprint(network_bp)
     app.register_blueprint(documents_api_bp)
+    app.register_blueprint(keys_api_bp)
     app.register_blueprint(vault_bp)
+    app.register_blueprint(signature_bp)
 
     install_network_middleware(app)
     install_security_middleware(app)

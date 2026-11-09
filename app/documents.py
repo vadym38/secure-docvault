@@ -21,11 +21,20 @@ from pathlib import Path
 
 from cryptography.exceptions import InvalidTag
 
+from . import digital_signature as ds
 from .database import (
     create_document,
+    create_document_signature,
+    create_signing_key,
     delete_document,
+    get_active_signing_key,
     get_document,
+    get_document_signature,
+    get_signing_key,
+    list_document_signatures,
     list_documents_for_user,
+    list_signing_keys,
+    mark_document_signature_verified,
 )
 from .file_crypto import FileCipher, make_aad
 from .sanitizer import sanitize_filename
@@ -74,12 +83,42 @@ class DocumentStorageError(DocumentError):
     code = "document_storage_error"
 
 
+class SigningKeyMissingError(DocumentError):
+    status = 400
+    code = "signing_key_missing"
+
+
+class SigningKeyForbiddenError(DocumentError):
+    status = 403
+    code = "signing_key_forbidden"
+
+
+class InvalidPassphraseError(DocumentError):
+    status = 400
+    code = "invalid_passphrase"
+
+
+class SigningKeyError(DocumentError):
+    status = 500
+    code = "signing_key_error"
+
+
+class DocumentSignatureError(DocumentError):
+    status = 409
+    code = "signature_invalid"
+
+
 @dataclass(frozen=True)
 class DownloadPayload:
     content: bytes
     filename: str
     content_type: str
     sha256: str
+    signature_status: str = "Unsigned"
+    signature_algorithm: str = ""
+    signer: str = ""
+    signature_fingerprint: str = ""
+    signature_signed_at: str = ""
 
 
 class DocumentService:
@@ -219,6 +258,10 @@ class DocumentService:
         return plaintext, container
 
     def _serialize(self, document) -> dict:
+        keys = document.keys()
+        signature_status = (
+            document["signature_status"] if "signature_status" in keys else None
+        )
         return {
             "document_id": document["id"],
             "original_filename": document["original_filename"],
@@ -228,9 +271,264 @@ class DocumentService:
             "sha256": document["sha256"],
             "owner_id": int(document["owner_id"]),
             "owner": document["owner_username"]
-            if "owner_username" in document.keys()
+            if "owner_username" in keys
             else None,
             "created_at": document["created_at"],
+            "signature_status": signature_status or "unsigned",
+            "signature_algorithm": document["signature_algorithm"]
+            if "signature_algorithm" in keys
+            else None,
+            "signature_signed_at": document["signature_signed_at"]
+            if "signature_signed_at" in keys
+            else None,
+            "signature_verified_at": document["signature_verified_at"]
+            if "signature_verified_at" in keys
+            else None,
+        }
+
+    # ------------------------------------------------------------------
+    # Ключі підпису та ЕЦП (ЛР №6)
+    # ------------------------------------------------------------------
+
+    def generate_signing_key(self, user, passphrase: str) -> dict:
+        try:
+            ds.validate_passphrase(passphrase)
+            pair = ds.generate_keypair_pem(passphrase)
+        except ValueError as exc:
+            raise InvalidPassphraseError(str(exc)) from exc
+
+        key_id = str(uuid.uuid4())
+        try:
+            create_signing_key(
+                key_id=key_id,
+                user_id=self._user_id(user),
+                algorithm=ds.ALGORITHM,
+                public_key_pem=pair.public_key_pem,
+                private_key_pem_encrypted=pair.private_key_pem_encrypted,
+                fingerprint=pair.fingerprint,
+            )
+        except Exception as exc:
+            logger.exception("Не вдалося зберегти ключ підпису")
+            raise SigningKeyError("Не вдалося зберегти ключ підпису.") from exc
+
+        logger.info(
+            "Ключ підпису створено: user=%s fingerprint=%s",
+            user["username"],
+            pair.fingerprint,
+        )
+        return {
+            "key_id": key_id,
+            "algorithm": ds.ALGORITHM,
+            "public_key_pem": pair.public_key_pem,
+            "private_key_pem_encrypted": pair.private_key_pem_encrypted,
+            "fingerprint": pair.fingerprint,
+            "is_active": True,
+        }
+
+    def list_signing_keys(self, user) -> list[dict]:
+        return [
+            {
+                "key_id": row["key_id"],
+                "algorithm": row["algorithm"],
+                "public_key_pem": row["public_key_pem"],
+                "fingerprint": row["fingerprint"],
+                "created_at": row["created_at"],
+                "is_active": bool(row["is_active"]),
+            }
+            for row in list_signing_keys(self._user_id(user))
+        ]
+
+    def active_signing_key(self, user) -> dict | None:
+        row = get_active_signing_key(self._user_id(user))
+        if row is None:
+            return None
+        return {
+            "key_id": row["key_id"],
+            "algorithm": row["algorithm"],
+            "public_key_pem": row["public_key_pem"],
+            "fingerprint": row["fingerprint"],
+            "created_at": row["created_at"],
+            "is_active": True,
+        }
+
+    def export_signing_key(
+        self,
+        user,
+        key_id: str,
+        passphrase: str,
+    ) -> dict:
+        row = get_signing_key(key_id)
+        if row is None or int(row["user_id"]) != self._user_id(user):
+            raise SigningKeyForbiddenError("Ключ підпису не знайдено.")
+        try:
+            private_key = ds.load_private_pem(
+                row["private_key_pem_encrypted"],
+                passphrase,
+            )
+            exported = ds.serialize_private_pem(private_key, passphrase)
+        except (ValueError, TypeError) as exc:
+            raise InvalidPassphraseError(
+                "Невірна парольна фраза або пошкоджений ключ."
+            ) from exc
+        return {
+            "key_id": key_id,
+            "algorithm": row["algorithm"],
+            "public_key_pem": row["public_key_pem"],
+            "private_key_pem_encrypted": exported,
+            "fingerprint": row["fingerprint"],
+        }
+
+    def get_encrypted_private_key(self, user, key_id: str) -> str:
+        row = get_signing_key(key_id)
+        if row is None or int(row["user_id"]) != self._user_id(user):
+            raise SigningKeyForbiddenError("Ключ підпису не знайдено.")
+        return row["private_key_pem_encrypted"]
+
+    def _signature_info(self, document_id: str, status: str | None = None) -> dict:
+        row = get_document_signature(document_id)
+        if row is None:
+            return {
+                "status": "unsigned",
+                "verified": False,
+                "algorithm": None,
+                "signer": None,
+                "signed_at": None,
+                "verified_at": None,
+                "fingerprint": None,
+                "key_id": None,
+                "signature_b64": None,
+                "document_sha256": None,
+            }
+        final_status = status or row["status"]
+        return {
+            "status": final_status,
+            "verified": final_status == "verified",
+            "algorithm": row["algorithm"],
+            "signer": row["signer_username"],
+            "signer_id": int(row["signer_id"]),
+            "signed_at": row["signed_at"],
+            "verified_at": row["verified_at"],
+            "fingerprint": row["key_fingerprint"],
+            "key_id": row["key_id"],
+            "signature_b64": row["signature_b64"],
+            "document_sha256": row["document_sha256"],
+        }
+
+    def _verify_signature(
+        self,
+        document,
+        plaintext: bytes,
+        *,
+        update_status: bool = True,
+    ) -> dict:
+        row = get_document_signature(document["id"])
+        if row is None:
+            return self._signature_info(document["id"])
+
+        valid = False
+        try:
+            public_key = ds.load_public_pem(row["public_key_pem"])
+            signature = ds.signature_from_b64(row["signature_b64"])
+            digest = ds.sha256_digest(plaintext)
+            valid = ds.verify_digest(digest, signature, public_key)
+        except (ValueError, TypeError):
+            valid = False
+
+        status = "verified" if valid else "invalid"
+        if update_status:
+            mark_document_signature_verified(document["id"], status)
+        if not valid:
+            logger.warning(
+                "ЕЦП недійсний: document=%s signer=%s key=%s",
+                document["id"],
+                row["signer_id"],
+                row["key_id"],
+            )
+        return self._signature_info(document["id"], status=status)
+
+    def sign_document(self, user, doc_id: str, passphrase: str) -> dict:
+        document = get_document(doc_id)
+        self._authorize(document, user)
+
+        key = get_active_signing_key(self._user_id(user))
+        if key is None:
+            raise SigningKeyMissingError(
+                "Спочатку згенеруйте ключ підпису в Signature Lab."
+            )
+
+        try:
+            private_key = ds.load_private_pem(
+                key["private_key_pem_encrypted"],
+                passphrase,
+            )
+        except (ValueError, TypeError) as exc:
+            raise InvalidPassphraseError(
+                "Невірна парольна фраза для приватного ключа."
+            ) from exc
+
+        plaintext, _container = self._read_verified_plaintext(document)
+        digest = ds.sha256_digest(plaintext)
+        signature = ds.sign_digest(digest, private_key)
+
+        public_key = ds.load_public_pem(key["public_key_pem"])
+        if not ds.verify_digest(digest, signature, public_key):
+            raise SigningKeyError(
+                "Підпис не пройшов самоперевірку відкритим ключем."
+            )
+
+        create_document_signature(
+            document_id=doc_id,
+            signer_id=self._user_id(user),
+            key_id=key["key_id"],
+            algorithm=key["algorithm"],
+            document_sha256=digest.hex(),
+            signature_b64=ds.signature_to_b64(signature),
+        )
+        mark_document_signature_verified(doc_id, "verified")
+        logger.info(
+            "Документ підписано: doc=%s signer=%s key=%s",
+            doc_id,
+            user["username"],
+            key["key_id"],
+        )
+        return self._signature_info(doc_id, status="verified")
+
+    def get_signature_info(self, user, doc_id: str) -> dict:
+        document = get_document(doc_id)
+        self._authorize(document, user)
+        if get_document_signature(doc_id) is None:
+            return self._signature_info(doc_id)
+        plaintext, _container = self._read_verified_plaintext(document)
+        return self._verify_signature(document, plaintext)
+
+    def list_signatures(self, user, limit: int = 20) -> list[dict]:
+        return [
+            {
+                "document_id": row["document_id"],
+                "original_filename": row["original_filename"],
+                "algorithm": row["algorithm"],
+                "document_sha256": row["document_sha256"],
+                "signature_b64": row["signature_b64"],
+                "signed_at": row["signed_at"],
+                "verified_at": row["verified_at"],
+                "status": row["status"],
+                "key_id": row["key_id"],
+                "fingerprint": row["key_fingerprint"],
+            }
+            for row in list_document_signatures(self._user_id(user), limit=limit)
+        ]
+
+    def signing_stats(self, user) -> dict:
+        keys = list_signing_keys(self._user_id(user))
+        signatures = list_document_signatures(self._user_id(user), limit=200)
+        active = next((key for key in keys if key["is_active"]), None)
+        return {
+            "keys": len(keys),
+            "active_key_id": active["key_id"] if active else None,
+            "fingerprint": active["fingerprint"] if active else None,
+            "signatures": len(signatures),
+            "verified": sum(1 for item in signatures if item["status"] == "verified"),
+            "invalid": sum(1 for item in signatures if item["status"] == "invalid"),
         }
 
     # ------------------------------------------------------------------
@@ -311,11 +609,28 @@ class DocumentService:
         document = get_document(doc_id)
         self._authorize(document, user)
         plaintext, _container = self._read_verified_plaintext(document)
+        signature = self._verify_signature(document, plaintext)
+
+        if signature["status"] == "invalid":
+            raise DocumentSignatureError(
+                "Цифровий підпис документа недійсний. Файл не видано."
+            )
+
+        status_label = (
+            "Signed & Verified"
+            if signature["status"] == "verified"
+            else "Unsigned"
+        )
         return DownloadPayload(
             content=plaintext,
             filename=document["original_filename"],
             content_type=document["content_type"],
             sha256=document["sha256"],
+            signature_status=status_label,
+            signature_algorithm=signature.get("algorithm") or "",
+            signer=signature.get("signer") or "",
+            signature_fingerprint=signature.get("fingerprint") or "",
+            signature_signed_at=signature.get("signed_at") or "",
         )
 
     def container_preview(
@@ -328,6 +643,7 @@ class DocumentService:
         document = get_document(doc_id)
         self._authorize(document, user)
         _plaintext, container = self._read_verified_plaintext(document)
+        signature = self._verify_signature(document, _plaintext)
         parts = self.cipher.parse_container(container)
         preview = container[:hex_limit]
 
@@ -341,6 +657,7 @@ class DocumentService:
             "hexdump": self.hexdump(preview),
             "hexdump_truncated": len(container) > hex_limit,
             "hexdump_size": len(preview),
+            "signature": signature,
         }
 
     def delete(self, user, doc_id: str) -> None:

@@ -20,6 +20,7 @@ from flask import (
 from io import BytesIO
 
 from .auth import login_required
+from .digital_signature import MIN_PASSPHRASE_LENGTH
 from .documents import DocumentError, DocumentTooLargeError
 
 vault_bp = Blueprint("vault", __name__, url_prefix="/vault")
@@ -48,6 +49,8 @@ def index():
         "vault.html",
         documents=documents,
         stats=service.stats(g.user),
+        signing_stats=service.signing_stats(g.user),
+        has_signing_key=service.active_signing_key(g.user) is not None,
         key_fingerprint=service.cipher.fingerprint,
         key_count=service.cipher.key_count,
         max_bytes=service.max_bytes,
@@ -102,8 +105,30 @@ def document_detail(doc_id: str):
     return render_template(
         "vault_document.html",
         document=document,
+        active_key=service.active_signing_key(g.user),
+        min_passphrase=MIN_PASSPHRASE_LENGTH,
         key_fingerprint=service.cipher.fingerprint,
     )
+
+
+@vault_bp.post("/<doc_id>/sign")
+@login_required
+def sign(doc_id: str):
+    _verify_csrf()
+    passphrase = request.form.get("passphrase", "")
+    service = _service()
+    try:
+        signature = service.sign_document(g.user, doc_id, passphrase)
+    except DocumentError as error:
+        flash(str(error), "error")
+        return redirect(url_for("vault.document_detail", doc_id=doc_id))
+
+    flash(
+        f"Документ підписано RSA-PSS. Статус: Signed & Verified "
+        f"({signature['algorithm']}).",
+        "success",
+    )
+    return redirect(url_for("vault.document_detail", doc_id=doc_id))
 
 
 @vault_bp.get("/<doc_id>/download")
@@ -124,6 +149,13 @@ def download(doc_id: str):
     )
     response.headers["X-Content-SHA256"] = payload.sha256
     response.headers["X-Document-Encryption"] = "AES-256-GCM"
+    response.headers["X-Signature-Status"] = payload.signature_status
+    if payload.signature_algorithm:
+        response.headers["X-Signature-Algorithm"] = payload.signature_algorithm
+    if payload.signer:
+        response.headers["X-Signer"] = payload.signer
+    if payload.signature_fingerprint:
+        response.headers["X-Signature-Fingerprint"] = payload.signature_fingerprint
     return response
 
 

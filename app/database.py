@@ -106,6 +106,42 @@ CREATE INDEX IF NOT EXISTS idx_documents_owner
 
 CREATE INDEX IF NOT EXISTS idx_documents_created
     ON documents (created_at DESC);
+
+-- ЛР №6: ключі підпису користувача. Приватний ключ зберігається лише
+-- як PKCS#8 PEM, зашифрований парольною фразою користувача.
+CREATE TABLE IF NOT EXISTS user_signing_keys (
+    key_id                  TEXT    PRIMARY KEY,
+    user_id                 INTEGER NOT NULL,
+    algorithm               TEXT    NOT NULL,
+    public_key_pem          TEXT    NOT NULL,
+    private_key_pem_encrypted TEXT  NOT NULL,
+    fingerprint             TEXT    NOT NULL,
+    created_at              TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    is_active               INTEGER NOT NULL DEFAULT 1
+                            CHECK (is_active IN (0, 1)),
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_signing_keys_user
+    ON user_signing_keys (user_id, is_active);
+
+-- ЛР №6: ЕЦП документа. Один підпис на документ; key_id дозволяє
+-- перевірити старі підписи після ротації ключа.
+CREATE TABLE IF NOT EXISTS document_signatures (
+    document_id       TEXT    PRIMARY KEY,
+    signer_id         INTEGER NOT NULL,
+    key_id            TEXT    NOT NULL,
+    algorithm         TEXT    NOT NULL,
+    document_sha256   TEXT    NOT NULL,
+    signature_b64     TEXT    NOT NULL,
+    signed_at         TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    verified_at       TEXT,
+    status            TEXT    NOT NULL DEFAULT 'signed'
+                      CHECK (status IN ('signed', 'verified', 'invalid')),
+    FOREIGN KEY (document_id) REFERENCES documents (id) ON DELETE CASCADE,
+    FOREIGN KEY (signer_id) REFERENCES users (id) ON DELETE CASCADE,
+    FOREIGN KEY (key_id) REFERENCES user_signing_keys (key_id)
+);
 """
 
 
@@ -505,9 +541,18 @@ def get_document(doc_id: str) -> sqlite3.Row | None:
 
     return get_db().execute(
         """
-        SELECT d.*, u.username AS owner_username
+        SELECT d.*, u.username AS owner_username,
+               s.status AS signature_status,
+               s.algorithm AS signature_algorithm,
+               s.signed_at AS signature_signed_at,
+               s.verified_at AS signature_verified_at,
+               s.key_id AS signature_key_id,
+               s.signer_id AS signature_signer_id,
+               s.signature_b64 AS signature_b64,
+               s.document_sha256 AS signature_document_sha256
         FROM documents AS d
         LEFT JOIN users AS u ON u.id = d.owner_id
+        LEFT JOIN document_signatures AS s ON s.document_id = d.id
         WHERE d.id = ?
         """,
         (doc_id,),
@@ -526,9 +571,18 @@ def list_documents_for_user(
     if is_admin:
         rows = db.execute(
             """
-            SELECT d.*, u.username AS owner_username
+            SELECT d.*, u.username AS owner_username,
+                   s.status AS signature_status,
+                   s.algorithm AS signature_algorithm,
+                   s.signed_at AS signature_signed_at,
+                   s.verified_at AS signature_verified_at,
+                   s.key_id AS signature_key_id,
+                   s.signer_id AS signature_signer_id,
+                   s.signature_b64 AS signature_b64,
+                   s.document_sha256 AS signature_document_sha256
             FROM documents AS d
             LEFT JOIN users AS u ON u.id = d.owner_id
+            LEFT JOIN document_signatures AS s ON s.document_id = d.id
             ORDER BY d.created_at DESC
             LIMIT ?
             """,
@@ -537,9 +591,18 @@ def list_documents_for_user(
     else:
         rows = db.execute(
             """
-            SELECT d.*, u.username AS owner_username
+            SELECT d.*, u.username AS owner_username,
+                   s.status AS signature_status,
+                   s.algorithm AS signature_algorithm,
+                   s.signed_at AS signature_signed_at,
+                   s.verified_at AS signature_verified_at,
+                   s.key_id AS signature_key_id,
+                   s.signer_id AS signature_signer_id,
+                   s.signature_b64 AS signature_b64,
+                   s.document_sha256 AS signature_document_sha256
             FROM documents AS d
             LEFT JOIN users AS u ON u.id = d.owner_id
+            LEFT JOIN document_signatures AS s ON s.document_id = d.id
             WHERE d.owner_id = ?
             ORDER BY d.created_at DESC
             LIMIT ?
@@ -556,5 +619,180 @@ def delete_document(doc_id: str) -> bool:
     cursor = db.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
     db.commit()
     return cursor.rowcount > 0
+
+
+# ---------------------------------------------------------------------------
+# Ключі підпису та ЕЦП документів (ЛР №6)
+# ---------------------------------------------------------------------------
+
+def deactivate_user_signing_keys(user_id: int) -> None:
+    db = get_db()
+    db.execute(
+        "UPDATE user_signing_keys SET is_active = 0 "
+        "WHERE user_id = ? AND is_active = 1",
+        (user_id,),
+    )
+    db.commit()
+
+
+def create_signing_key(
+    *,
+    key_id: str,
+    user_id: int,
+    algorithm: str,
+    public_key_pem: str,
+    private_key_pem_encrypted: str,
+    fingerprint: str,
+) -> None:
+    db = get_db()
+    db.execute(
+        "UPDATE user_signing_keys SET is_active = 0 WHERE user_id = ?",
+        (user_id,),
+    )
+    db.execute(
+        """
+        INSERT INTO user_signing_keys (
+            key_id, user_id, algorithm, public_key_pem,
+            private_key_pem_encrypted, fingerprint, is_active
+        )
+        VALUES (?, ?, ?, ?, ?, ?, 1)
+        """,
+        (
+            key_id,
+            user_id,
+            algorithm,
+            public_key_pem,
+            private_key_pem_encrypted,
+            fingerprint,
+        ),
+    )
+    db.commit()
+
+
+def get_active_signing_key(user_id: int) -> sqlite3.Row | None:
+    return get_db().execute(
+        """
+        SELECT * FROM user_signing_keys
+        WHERE user_id = ? AND is_active = 1
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        (user_id,),
+    ).fetchone()
+
+
+def get_signing_key(key_id: str) -> sqlite3.Row | None:
+    return get_db().execute(
+        "SELECT * FROM user_signing_keys WHERE key_id = ?",
+        (key_id,),
+    ).fetchone()
+
+
+def list_signing_keys(user_id: int) -> list[sqlite3.Row]:
+    return list(
+        get_db().execute(
+            """
+            SELECT key_id, user_id, algorithm, public_key_pem,
+                   fingerprint, created_at, is_active
+            FROM user_signing_keys
+            WHERE user_id = ?
+            ORDER BY is_active DESC, created_at DESC
+            """,
+            (user_id,),
+        ).fetchall()
+    )
+
+
+def create_document_signature(
+    *,
+    document_id: str,
+    signer_id: int,
+    key_id: str,
+    algorithm: str,
+    document_sha256: str,
+    signature_b64: str,
+) -> None:
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO document_signatures (
+            document_id, signer_id, key_id, algorithm,
+            document_sha256, signature_b64, status
+        )
+        VALUES (?, ?, ?, ?, ?, ?, 'signed')
+        ON CONFLICT(document_id) DO UPDATE SET
+            signer_id = excluded.signer_id,
+            key_id = excluded.key_id,
+            algorithm = excluded.algorithm,
+            document_sha256 = excluded.document_sha256,
+            signature_b64 = excluded.signature_b64,
+            signed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+            verified_at = NULL,
+            status = 'signed'
+        """,
+        (
+            document_id,
+            signer_id,
+            key_id,
+            algorithm,
+            document_sha256,
+            signature_b64,
+        ),
+    )
+    db.commit()
+
+
+def get_document_signature(document_id: str) -> sqlite3.Row | None:
+    return get_db().execute(
+        """
+        SELECT s.*, u.username AS signer_username,
+               k.public_key_pem, k.fingerprint AS key_fingerprint
+        FROM document_signatures AS s
+        LEFT JOIN users AS u ON u.id = s.signer_id
+        LEFT JOIN user_signing_keys AS k ON k.key_id = s.key_id
+        WHERE s.document_id = ?
+        """,
+        (document_id,),
+    ).fetchone()
+
+
+def mark_document_signature_verified(document_id: str, status: str) -> None:
+    if status not in {"signed", "verified", "invalid"}:
+        raise ValueError("Некоректний статус підпису.")
+    db = get_db()
+    db.execute(
+        """
+        UPDATE document_signatures
+        SET status = ?,
+            verified_at = CASE
+                WHEN ? = 'verified' THEN strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+                WHEN ? = 'invalid' THEN NULL
+                ELSE verified_at
+            END
+        WHERE document_id = ?
+        """,
+        (status, status, status, document_id),
+    )
+    db.commit()
+
+
+def list_document_signatures(user_id: int, limit: int = 20) -> list[sqlite3.Row]:
+    return list(
+        get_db().execute(
+            """
+            SELECT s.document_id, s.signer_id, s.algorithm, s.document_sha256,
+                   s.signature_b64, s.signed_at, s.verified_at, s.status,
+                   s.key_id, d.original_filename,
+                   k.fingerprint AS key_fingerprint
+            FROM document_signatures AS s
+            JOIN documents AS d ON d.id = s.document_id
+            LEFT JOIN user_signing_keys AS k ON k.key_id = s.key_id
+            WHERE s.signer_id = ?
+            ORDER BY s.signed_at DESC
+            LIMIT ?
+            """,
+            (user_id, limit),
+        ).fetchall()
+    )
 
 

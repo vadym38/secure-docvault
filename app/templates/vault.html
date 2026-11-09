@@ -9,6 +9,7 @@
   <header class="lab-head">
     {% include "_brand.html" %}
     <nav class="api-head-actions" aria-label="Навігація">
+      <a class="btn btn--ghost" href="{{ url_for('signature.index') }}">ЕЦП / Ключі</a>
       <a class="btn btn--ghost" href="{{ url_for('network.lab_index') }}">WAF</a>
       <a class="btn btn--ghost" href="{{ url_for('client.lab_index') }}">Клієнтський захист</a>
       <a class="btn btn--ghost" href="{{ url_for('auth.dashboard') }}">Кабінет</a>
@@ -52,6 +53,17 @@
       <small>лише .enc-контейнери · ліміт {{ (max_bytes / 1024 / 1024)|round(1) }} МБ</small>
     </article>
   </section>
+
+  {% if not has_signing_key %}
+    <div class="sigil-callout">
+      <span class="icon-tile">{{ icon('key') }}</span>
+      <div>
+        <strong>Ключ підпису ще не створено</strong>
+        <p>Документи можна завантажувати, але для статусу Signed &amp; Verified створіть RSA-PSS ключ у Signature Lab.</p>
+      </div>
+      <a class="btn btn--secondary btn--small" href="{{ url_for('signature.index') }}">Створити ключ</a>
+    </div>
+  {% endif %}
 
   <div class="vault-grid">
     <section class="panel vault-panel">
@@ -129,7 +141,7 @@
         <thead>
           <tr>
             <th>Файл</th><th>Розмір</th><th>Контейнер</th>
-            <th>SHA-256</th><th>Створено</th><th></th>
+            <th>SHA-256</th><th>Підпис</th><th>Створено</th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -144,6 +156,11 @@
               <td class="mono">{{ item.size_bytes }} B</td>
               <td class="mono">{{ item.encrypted_size_bytes }} B</td>
               <td class="mono vault-hash">{{ item.sha256[:16] }}…</td>
+              <td>
+                <span class="signature-badge signature-badge--{{ item.signature_status }}">
+                  {{ "Signed & Verified" if item.signature_status == "verified" else ("Invalid" if item.signature_status == "invalid" else ("Signed" if item.signature_status == "signed" else "Unsigned")) }}
+                </span>
+              </td>
               <td class="mono">{{ item.created_at }}</td>
               <td class="vault-row-actions">
                 <a class="btn btn--ghost btn--small" href="{{ url_for('vault.document_detail', doc_id=item.document_id) }}">Деталі</a>
@@ -152,7 +169,7 @@
             </tr>
           {% else %}
             <tr>
-              <td colspan="6" class="empty-cell">
+              <td colspan="7" class="empty-cell">
                 Сховище порожнє. Завантажте перший документ — він одразу
                 перетвориться на AES-256-GCM контейнер.
               </td>

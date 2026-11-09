@@ -25,9 +25,9 @@
       <a class="nav-item" href="{{ url_for('vault.index') }}">
         {{ icon('lock') }}<span>Сховище файлів</span>
       </a>
-      <span class="nav-item is-disabled" aria-disabled="true">
-        {{ icon('key') }}<span>Підписи</span><small>ЛР 6</small>
-      </span>
+      <a class="nav-item" href="{{ url_for('signature.index') }}">
+        {{ icon('key') }}<span>ЕЦП / Підписи</span>
+      </a>
     </nav>
 
     <div class="console__nav-foot">
@@ -38,7 +38,7 @@
           {{ icon('logout') }}<span>Завершити сесію</span>
         </button>
       </form>
-      <p class="mono console__version">v0.5-file-encryption</p>
+      <p class="mono console__version">v0.6-digital-signature</p>
     </div>
   </aside>
 
@@ -103,7 +103,7 @@
       <section class="panel">
         <div class="panel__head">
           <h2>Постура безпеки</h2>
-          <span class="badge badge--ok">Stage 5</span>
+          <span class="badge badge--ok">Stage 6</span>
         </div>
         <ul class="check-list">
           <li><span class="check">{{ icon('check') }}</span>Пароль збережено як bcrypt-хеш із унікальною сіллю</li>
@@ -113,14 +113,15 @@
           <li><span class="check">{{ icon('check') }}</span>WAF: сигнатури, Greylist і журнал інцидентів</li>
           <li><span class="check">{{ icon('check') }}</span>Rate Limiting: login 5/хв, API 60/хв</li>
           <li><span class="check">{{ icon('check') }}</span>Файли: AES-256-GCM, IV + Tag + Ciphertext</li>
-          <li class="is-next"><span class="check">{{ icon('arrow') }}</span>Наступний етап: ЕЦП і неспростовність</li>
+          <li><span class="check">{{ icon('check') }}</span>ЕЦП: RSA-PSS 2048, SHA-256, non-repudiation</li>
+          <li class="is-next"><span class="check">{{ icon('arrow') }}</span>Наступний етап: Docker і DevSecOps-аудит</li>
         </ul>
         <div class="vault-dashboard-actions">
           <a class="btn btn--secondary" href="{{ url_for('vault.index') }}">
             {{ icon('lock') }}<span>Відкрити Cipher Vault</span>
           </a>
-          <a class="btn btn--ghost" href="{{ url_for('auth.api_lab') }}">
-            {{ icon('key') }}<span>JWT API</span>
+          <a class="btn btn--ghost" href="{{ url_for('signature.index') }}">
+            {{ icon('key') }}<span>Signature Lab</span>
           </a>
         </div>
       </section>

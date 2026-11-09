@@ -104,7 +104,48 @@ def download_document(doc_id: str):
     )
     response.headers["X-Content-SHA256"] = payload.sha256
     response.headers["X-Document-Encryption"] = "AES-256-GCM"
+    response.headers["X-Signature-Status"] = payload.signature_status
+    if payload.signature_algorithm:
+        response.headers["X-Signature-Algorithm"] = payload.signature_algorithm
+    if payload.signer:
+        response.headers["X-Signer"] = payload.signer
+    if payload.signature_fingerprint:
+        response.headers["X-Signature-Fingerprint"] = payload.signature_fingerprint
+    if payload.signature_signed_at:
+        response.headers["X-Signed-At"] = payload.signature_signed_at
     return response
+
+
+@documents_api_bp.post("/<doc_id>/sign")
+@require_access_token
+def sign_document(doc_id: str):
+    data = request.get_json(silent=True) or {}
+    passphrase = str(data.get("passphrase", ""))
+    if not passphrase:
+        raise ApiError(
+            400,
+            "missing_passphrase",
+            "Передайте парольну фразу приватного ключа у полі passphrase.",
+        )
+    signature = _service().sign_document(g.api_user, doc_id, passphrase)
+    return jsonify(
+        {
+            "status": "signed_and_verified",
+            "document_id": doc_id,
+            "signature": signature,
+        }
+    )
+
+
+@documents_api_bp.get("/<doc_id>/signature")
+@require_access_token
+def get_signature(doc_id: str):
+    return jsonify(
+        {
+            "document_id": doc_id,
+            "signature": _service().get_signature_info(g.api_user, doc_id),
+        }
+    )
 
 
 @documents_api_bp.delete("/<doc_id>")

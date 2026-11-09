@@ -1,9 +1,9 @@
-# Secure DocVault — етап 5: AES-256-GCM шифрування файлів
+# Secure DocVault — етап 6: ЕЦП, неспростовність і цілісність
 
-Навчальний проєкт до лабораторних робіт №1–5 з дисципліни
+Навчальний проєкт до лабораторних робіт №1–6 з дисципліни
 **«Технології захисту інформаційних ресурсів»**.
 
-Реалізовано п'ять шарів захисту корпоративного порталу **Secure DocVault**:
+Реалізовано шість шарів захисту корпоративного порталу **Secure DocVault**:
 
 1. **ЛР №1 — автентифікація та захист БД:** реєстрація, вхід, безпечне
    зберігання паролів у SQLite, захист від SQL-ін'єкцій, CSRF і session
@@ -23,20 +23,40 @@
    унікальний 96-бітний IV, контейнер `[12 B IV][16 B Tag][Ciphertext]`,
    завантаження/скачування з перевіркою прав, `InvalidTag` при зміні
    одного байта.
+6. **ЛР №6 — ЕЦП і неспростовність:** RSA-PSS 2048 + SHA-256,
+   encrypted PKCS#8 / X.509 PEM, підпис документа, перевірка відкритим
+   ключем і статус `Signed & Verified`.
 
 Замість десктопного PyQt-інтерфейсу з прикладу зроблено **веб-інтерфейс
 на Flask + Jinja2** з авторським темним дизайном «Obsidian Vault»,
-інтерактивними стендами `/api-lab`, `/client-lab`, `/waf-lab` і
-Cipher Vault `/vault`.
+інтерактивними стендами `/api-lab`, `/client-lab`, `/waf-lab`,
+Cipher Vault `/vault` і Signature Lab `/signature-lab`.
 
 > **Статус:** виконано ЛР №1 (тег `v0.1-auth-db`), ЛР №2
 > (тег `v0.2-jwt-api`), ЛР №3 (тег `v0.3-client-security`), ЛР №4
-> (тег `v0.4-waf-ratelimit`) і ЛР №5 (тег `v0.5-file-encryption`).
-> Цифрові підписи з наступного етапу навмисно не додані.
+> (тег `v0.4-waf-ratelimit`), ЛР №5 (тег `v0.5-file-encryption`) і
+> ЛР №6 (тег `v0.6-digital-signature`). Docker/DevSecOps з наступного
+> етапу навмисно не додані.
 
 ---
 
 ## 1. Що демонструє проєкт
+
+### ЛР №6 — ЕЦП RSA-PSS і неспростовність
+
+| Вимога ЛР | Реалізація |
+|---|---|
+| Генерація пари RSA | `app/digital_signature.py`: RSA-2048, public exponent 65537 |
+| Приватний ключ PKCS#8 + passphrase | `serialize_private_pem()` / `BestAvailableEncryption` |
+| Відкритий ключ X.509 PEM | `serialize_public_pem()` |
+| Підпис SHA-256 + RSA-PSS | `sign_digest()` з `Prehashed(SHA256)`, MGF1, salt=MAX_LENGTH |
+| Верифікація | `verify_digest()` / `verify_document()` → `InvalidSignature` |
+| Збереження в БД | таблиці `user_signing_keys`, `document_signatures` |
+| Інтеграція в API | `POST /api/v1/documents/<id>/sign`, `GET .../signature` |
+| Статус у download | `X-Signature-Status: Signed & Verified`, `X-Signer`, fingerprint |
+| Веб-інтерфейс | `/signature-lab`, PEM-панель, підпис у `/vault/<id>` |
+| Тести | 37 нових: 18 unit crypto, 15 інтеграційних, 4 Selenium E2E |
+| Звіт | `docs/screenshots 6/`, `docs/digital_signature_architecture.html` |
 
 ### ЛР №5 — AES-256-GCM шифрування файлів
 
@@ -128,7 +148,7 @@ Cipher Vault `/vault`.
 - **Flask 3.1** + Jinja2 — серверний рендеринг і REST API
 - **PyJWT 2.15** — підпис та валідація JWT (HS256)
 - **Bleach 6.4** — санітизація HTML/JS-векторів у користувацькому вводі
-- **cryptography 50.0.2** — AES-256-GCM (AEAD) для файлів у стані спокою
+- **cryptography 50.0.2** — AES-256-GCM (AEAD) та RSA-PSS/SHA-256 для ЕЦП
 - **SQLite** — локальна реляційна БД, режим WAL
 - **bcrypt 5.0** — хешування паролів, work factor 12
 - **HTML/CSS/vanilla JS** — адаптивний інтерфейс без зовнішніх CDN
@@ -163,6 +183,9 @@ secure-docvault/
 │   ├── documents.py             # ЛР №5: сервіс сховища, IDOR, integrity
 │   ├── documents_api.py         # ЛР №5: /api/v1/documents/*
 │   ├── vault.py                 # ЛР №5: веб-інтерфейс /vault
+│   ├── digital_signature.py     # ЛР №6: RSA-PSS, PKCS#8/X.509 PEM
+│   ├── keys_api.py              # ЛР №6: /api/v1/keys/*
+│   ├── signature_lab.py         # ЛР №6: веб-інтерфейс /signature-lab
 │   ├── jwt_service.py           # випуск/декодування JWT, заборона alg:none
 │   ├── config.py                # конфігурація з .env (сесії, JWT, CORS, WAF, AES)
 │   ├── database.py              # users, refresh_tokens, client_notes, documents
@@ -189,6 +212,7 @@ secure-docvault/
 │       ├── waf_lab.html         # панель WAF / Rate Limiting
 │       ├── vault.html           # Cipher Vault: список і завантаження
 │       ├── vault_document.html  # detail + hexdump контейнера
+│       ├── signature_lab.html   # Signature Lab: ключі, PEM, підписи
 │       ├── auth_base.html
 │       ├── base.html
 │       ├── dashboard.html
@@ -202,6 +226,9 @@ secure-docvault/
 │   ├── screenshots 3/           # скриншоти ЛР №3
 │   ├── screenshots 4/           # скриншоти ЛР №4
 │   ├── screenshots 5/           # скриншоти ЛР №5
+│   ├── screenshots 6/           # скриншоти ЛР №6
+│   ├── digital_signature_architecture.html # схема RSA-PSS / ЕЦП
+│   ├── signature_db_snapshot.html # HTML-знімок document_signatures
 │   ├── file_encryption_architecture.html # схема AES-GCM
 │   ├── network_security_architecture.html # схема WAF / Rate Limiter
 │   ├── client_security_architecture.html # схема ешелонованого захисту
@@ -215,9 +242,13 @@ secure-docvault/
 │   ├── capture_screenshots_lab3.py  # скриншоти ЛР №3
 │   ├── capture_screenshots_lab4.py  # скриншоти ЛР №4
 │   ├── capture_screenshots_lab5.py  # скриншоти ЛР №5
+│   ├── capture_screenshots_lab6.py  # скриншоти ЛР №6
 │   ├── stress_test_lab4.py      # стрес-тест 10 запитів + WAF
 │   ├── demo_lab5_api.py         # login → upload → download
 │   ├── integrity_test_lab5.py   # hexdump + InvalidTag
+│   ├── demo_lab6_signature.py   # keygen → sign → download
+│   ├── signature_tamper_lab6.py # tamper-тест ЕЦП
+│   ├── signature_db_snapshot.py # HTML-знімок document_signatures
 │   ├── jwt_db_snapshot.py       # HTML-знімок refresh_tokens
 │   ├── db_snapshot.py           # HTML-знімок users
 │   └── seed_demo.py             # створення демо-користувача
@@ -237,7 +268,10 @@ secure-docvault/
 │   ├── test_network_security_e2e.py # 6 Selenium E2E-тестів ЛР №4
 │   ├── test_file_crypto.py      # 20 юніт-тестів AES-GCM
 │   ├── test_documents.py        # 17 інтеграційних тестів сховища
-│   └── test_documents_e2e.py    # 4 Selenium E2E-тести Cipher Vault
+│   ├── test_documents_e2e.py    # 4 Selenium E2E-тести Cipher Vault
+│   ├── test_digital_signature.py # 18 юніт-тестів RSA-PSS
+│   ├── test_signatures.py       # 15 інтеграційних тестів ЕЦП
+│   └── test_signatures_e2e.py   # 4 Selenium E2E-тести Signature Lab
 ├── .env.example
 ├── .gitignore
 ├── README.md
@@ -357,6 +391,22 @@ PORT=5000
 | GET | `/api/v1/documents/<id>` | Bearer | метадані + hex-прев'ю |
 | GET | `/api/v1/documents/<id>/download` | Bearer | decrypt + `InvalidTag` → 409 |
 | DELETE | `/api/v1/documents/<id>` | Bearer | видалення документа |
+
+### ЕЦП та ключі (ЛР №6)
+
+| Метод | Маршрут | Доступ | Призначення |
+|---|---|---|---|
+| GET | `/signature-lab` | сесія | ключі, PEM, історія підписів |
+| POST | `/signature-lab/generate` | сесія + CSRF | генерація/ротація RSA-PSS ключа |
+| GET | `/signature-lab/keys/<id>/public` | сесія | public X.509 PEM |
+| GET | `/signature-lab/keys/<id>/private` | сесія | encrypted PKCS#8 PEM |
+| POST | `/vault/<id>/sign` | сесія + CSRF | підпис документа |
+| POST | `/api/v1/keys/generate` | Bearer | генерація ключа |
+| GET | `/api/v1/keys` | Bearer | список public-ключів |
+| GET | `/api/v1/keys/<id>` | Bearer | метадані ключа |
+| POST | `/api/v1/keys/<id>/export` | Bearer | експорт encrypted PKCS#8 |
+| POST | `/api/v1/documents/<id>/sign` | Bearer | підпис документа |
+| GET | `/api/v1/documents/<id>/signature` | Bearer | статус ЕЦП |
 
 ### REST API v1 (ЛР №2)
 
@@ -485,6 +535,49 @@ CREATE TABLE IF NOT EXISTS documents (
 `id` — випадковий UUID4, `stored_filename` — `<uuid>.enc`. Сам вміст
 лежить у каталозі `instance/vault/`, а не в SQLite. `sha256` — хеш
 **відкритого** тексту для додаткової перевірки після GCM-дешифрування.
+
+### `user_signing_keys` (ЛР №6)
+
+```sql
+CREATE TABLE IF NOT EXISTS user_signing_keys (
+    key_id                    TEXT    PRIMARY KEY,
+    user_id                   INTEGER NOT NULL,
+    algorithm                 TEXT    NOT NULL,
+    public_key_pem            TEXT    NOT NULL,
+    private_key_pem_encrypted TEXT    NOT NULL,
+    fingerprint               TEXT    NOT NULL,
+    created_at                TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    is_active                 INTEGER NOT NULL DEFAULT 1,
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+```
+
+Приватний ключ зберігається **лише** як encrypted PKCS#8 PEM. Парольна
+фраза не зберігається. `is_active=0` — retired-ключ після ротації; ним
+можна перевіряти старі підписи.
+
+### `document_signatures` (ЛР №6)
+
+```sql
+CREATE TABLE IF NOT EXISTS document_signatures (
+    document_id       TEXT    PRIMARY KEY,
+    signer_id         INTEGER NOT NULL,
+    key_id            TEXT    NOT NULL,
+    algorithm         TEXT    NOT NULL,
+    document_sha256   TEXT    NOT NULL,
+    signature_b64     TEXT    NOT NULL,
+    signed_at         TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    verified_at       TEXT,
+    status            TEXT    NOT NULL DEFAULT 'signed'
+                      CHECK (status IN ('signed', 'verified', 'invalid')),
+    FOREIGN KEY (document_id) REFERENCES documents (id) ON DELETE CASCADE,
+    FOREIGN KEY (signer_id) REFERENCES users (id) ON DELETE CASCADE,
+    FOREIGN KEY (key_id) REFERENCES user_signing_keys (key_id)
+);
+```
+
+`signature_b64` — 256-байтний RSA-PSS підпис у base64. `status`:
+`signed` → `verified` після успішної перевірки, `invalid` після підробки.
 
 ---
 
@@ -825,6 +918,79 @@ container = nonce + tag + ciphertext          # [12 B][16 B][N B]
 - HTML/JS/SVG-розширення не входять до allowlist, щоб сховище не стало
   XSS-репозиторієм.
 
+### 7.21. RSA-PSS і формат ключів (ЛР №6)
+
+`app/digital_signature.py`:
+
+```python
+private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+public_pem = serialize_public_pem(public_key)          # X.509 SPKI PEM
+private_pem = serialize_private_pem(private_key, passphrase)
+# PKCS#8 PEM + BestAvailableEncryption(passphrase)
+```
+
+Підпис:
+
+```python
+digest = sha256_digest(document)        # 32 байти
+signature = private_key.sign(
+    digest,
+    padding.PSS(
+        mgf=padding.MGF1(hashes.SHA256()),
+        salt_length=padding.PSS.MAX_LENGTH,
+    ),
+    utils.Prehashed(hashes.SHA256()),
+)
+```
+
+- підписується SHA-256-дайджест, а не весь файл;
+- RSA-PSS імовірнісний: два підписи одного файлу різні;
+- 256-байтний підпис для RSA-2048;
+- приватний ключ ніколи не зберігається у відкритому вигляді.
+
+### 7.22. Підписання та верифікація в робочому процесі (ЛР №6)
+
+`POST /api/v1/documents/<id>/sign`:
+
+1. перевірка власника/admin і активної ключової пари;
+2. `load_pem_private_key(encrypted_pem, passphrase)`;
+3. AES-GCM-дешифрування документа + SHA-256;
+4. RSA-PSS підпис дайджесту;
+5. самоперевірка відкритим ключем;
+6. запис у `document_signatures`, статус `verified`.
+
+`GET /api/v1/documents/<id>/download`:
+
+1. AES-GCM tag + SHA-256 plaintext (ЛР №5);
+2. RSA-PSS verify(digest, signature, public_key);
+3. `invalid` → `409 signature_invalid`, файл не видається;
+4. `verified` → `X-Signature-Status: Signed & Verified`.
+
+### 7.23. Ключі, парольна фраза та ротація (ЛР №6)
+
+- ключ генерується на сервері, приватна частина шифрується PKCS#8
+  парольною фразою користувача (мін. 8 символів);
+- парольна фраза не логується й не зберігається; без неї підпис
+  неможливий;
+- експорт приватного ключа — лише encrypted PEM; відкритий ключ —
+  X.509 PEM;
+- `fingerprint = SHA-256(SPKI DER)`;
+- ротація створює новий active key, старі ключі залишаються для
+  перевірки старих підписів;
+- у production приватні ключі слід тримати в HSM/KMS, а відкриті —
+  закріплювати сертифікатами X.509/PKI.
+
+### 7.24. Non-repudiation та обмеження PKI (ЛР №6)
+
+- HMAC має спільний секрет, тому не доводить авторство третьій стороні;
+- RSA-PSS + приватний ключ власника дає неспростовність;
+- підпис зберігається разом із `signer_id`, `key_id`, `document_sha256`,
+  `signed_at`, `verified_at`;
+- підміна відкритого ключа в БД можлива без PKI: у production потрібні
+  сертифікати X.509, довірені CA та перевірка ланцюжка;
+- ECDSA/Ed25519 — коротші ключі/підписи та швидші операції, але RSA-PSS
+  обрано для наочності та сумісності.
+
 ---
 
 ## 8. Приклади запитів до API
@@ -911,7 +1077,7 @@ python -m unittest discover -v
 **Результат на момент здачі:**
 
 ```text
-Ran 213 tests in 56.0s
+Ran 250 tests in 67.8s
 OK
 ```
 
@@ -933,6 +1099,9 @@ OK
 | `test_file_crypto.py` | 20 | IV, Tag, roundtrip, tamper, AAD, key rotation, короткий контейнер |
 | `test_documents.py` | 17 | upload/download, IDOR, admin, 409 InvalidTag, валідація, UI |
 | `test_documents_e2e.py` | 4 | UI upload, detail/hexdump, заборонене розширення, delete |
+| `test_digital_signature.py` | 18 | RSA-PSS, PEM, passphrase, tamper, wrong key, PSS probabilistic |
+| `test_signatures.py` | 15 | keygen, export, sign, Signed & Verified, tamper, rotation, UI |
+| `test_signatures_e2e.py` | 4 | UI keygen, PEM, sign, vault badge, wrong passphrase |
 
 Окремі групи:
 
@@ -948,6 +1117,8 @@ python -m unittest tests.test_network_security -v
 python -m unittest tests.test_network_security_e2e -v
 python -m unittest tests.test_file_crypto tests.test_documents -v
 python -m unittest tests.test_documents_e2e -v
+python -m unittest tests.test_digital_signature tests.test_signatures -v
+python -m unittest tests.test_signatures_e2e -v
 ```
 
 ### Ручна перевірка JWT-протоколу
@@ -1010,9 +1181,50 @@ python -m unittest tests.test_documents_e2e -v
 6. Для тесту цілісності:
    `python scripts/integrity_test_lab5.py --mode all`.
 
+### Ручна перевірка ЕЦП
+
+1. Запустіть `python run.py`, увійдіть і відкрийте `/signature-lab`.
+2. Згенеруйте RSA-PSS ключ із парольною фразою (мін. 8 символів).
+3. Перегляньте public X.509 PEM і encrypted PKCS#8 PEM.
+4. Завантажте документ у `/vault`, відкрийте detail і підпишіть його
+   тією самою парольною фразою.
+5. Перевірте статус `Signed & Verified`, signer, fingerprint і
+   `X-Signature-Status` у відповіді download API.
+6. Для API-протоколу:
+   `python scripts/demo_lab6_signature.py --base-url http://127.0.0.1:5000`
+   (потрібен користувач `lab6.demo`).
+7. Для тесту фальсифікації:
+   `python scripts/signature_tamper_lab6.py`.
+
 ---
 
 ## 10. Скриншоти та звіт
+
+### ЛР №6 — `docs/screenshots 6/`
+
+Автоматично згенерувати всі скриншоти:
+
+```bash
+python scripts/capture_screenshots_lab6.py
+```
+
+Скрипт піднімає сервер, виконує keygen → upload → sign → download,
+запускає tamper-тест, проходить UI Signature Lab і генерує знімок БД.
+
+| Файл | Що демонструє |
+|---|---|
+| `00-signature-lab-overview.png` | огляд `/signature-lab`: алгоритм, ключ, підписи |
+| `01-keypair-pem.png` | public X.509 PEM + encrypted PKCS#8 PEM |
+| `02-document-signed.png` | підписаний документ, статус Signed & Verified |
+| `03-api-signed-download.png` | API keygen → sign → download, `X-Signature-Status` |
+| `04-tamper-signature.png` | зміна 1 байта → verify = False / `409` |
+| `05-signature-db.png` | таблиця `document_signatures` |
+| `06-vault-signed-documents.png` | список документів зі статусами ЕЦП |
+| `07-signature-architecture.png` | схема RSA-PSS / SHA-256 / неспростовність |
+
+Додатково: `docs/signature_db_snapshot.html` — HTML-знімок
+`document_signatures`; `docs/digital_signature_architecture.html` —
+схема процесу ЕЦП.
 
 ### ЛР №5 — `docs/screenshots 5/`
 
@@ -1161,6 +1373,7 @@ git tag
 # v0.3-client-security
 # v0.4-waf-ratelimit
 # v0.5-file-encryption
+# v0.6-digital-signature
 ```
 
 Перевірити історію:
@@ -1206,6 +1419,14 @@ python scripts/capture_screenshots_lab5.py
 python scripts/demo_lab5_api.py --base-url http://127.0.0.1:5000
 python scripts/integrity_test_lab5.py --mode all
 
+# скриншоти ЛР №6
+python scripts/capture_screenshots_lab6.py
+
+# API-протокол ЕЦП і tamper-тест
+python scripts/demo_lab6_signature.py --base-url http://127.0.0.1:5000
+python scripts/signature_tamper_lab6.py
+python scripts/signature_db_snapshot.py --db instance/docvault.db
+
 # перевірити health-check
 http://127.0.0.1:5000/healthz
 http://127.0.0.1:5000/api/v1/health
@@ -1228,7 +1449,11 @@ http://127.0.0.1:5000/api/v1/health
   потрібен KMS/HSM/secret manager, аудит доступу та планова ротація;
 - файли читаються в пам'ять повністю (ліміт 5 МБ); для великих файлів
   потрібне потокове/chunked-шифрування;
-- немає цифрових підписів — ЛР №6;
+- ЕЦП не має повноцінної PKI: відкриті ключі зберігаються в БД, а не
+  закріплюються сертифікатами X.509/CA; для production потрібен PKI,
+  перевірка ланцюжка та захист від підміни public key;
+- приватні ключі підпису зберігаються encrypted PKCS#8 у БД; для
+  production краще HSM/KMS із двофакторним доступом;
 - JWT зберігаються на клієнті в пам'яті стенда; у production-фронтенді
   Refresh-токен варто тримати в `HttpOnly Secure SameSite=Strict` cookie;
 - `Secure`-cookie та HSTS повноцінно працюють лише за HTTPS; на
@@ -1298,6 +1523,25 @@ IDOR. Водночас ключ потребує окремого захищен
 
 ---
 
-## 17. Ліцензія
+## 17. Висновок до ЛР №6
+
+ЕЦП у Secure DocVault реалізовано як RSA-PSS 2048 + SHA-256: приватний
+ключ зберігається лише у encrypted PKCS#8 PEM, відкритий — у X.509 PEM,
+а підпис 256 байтів фіксується в `document_signatures` разом із
+signer_id, key_id, SHA-256 документа і часом. Під час скачування сервіс
+перевіряє AES-GCM tag, SHA-256 plaintext і RSA-PSS підпис; статус
+`Signed & Verified` повертається в API, а будь-яка зміна документа,
+підпису або контейнера призводить до `verify = False` і `409`. Це дає
+неспростовність авторства та авторську цілісність на додачу до
+конфіденційності ЛР №5, а ротація ключів не ламає перевірку старих
+підписів. Водночас без PKI/сертифікатів X.509 зберігається ризик підміни
+відкритого ключа, а приватні ключі у production слід тримати в HSM/KMS;
+тести (18 unit crypto, 15 інтеграційних і 4 Selenium E2E) підтверджують
+PEM-формати, passphrase-захист, підпис/верифікацію, ротацію, tamper і
+коректну роботу UI.
+
+---
+
+## 18. Ліцензія
 
 Навчальний проєкт. Використовуйте лише для освітніх цілей.

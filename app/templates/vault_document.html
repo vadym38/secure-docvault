@@ -36,6 +36,78 @@
     </div>
   </section>
 
+  <section class="panel sigil-panel signature-panel">
+    <div class="panel__head">
+      <h2>Електронний цифровий підпис</h2>
+      {% set sig = document.signature %}
+      <span class="signature-badge signature-badge--{{ sig.status }}">
+        {{ "Signed & Verified" if sig.status == "verified" else ("Invalid" if sig.status == "invalid" else ("Signed" if sig.status == "signed" else "Unsigned")) }}
+      </span>
+    </div>
+
+    {% if sig.status in ("signed", "verified") %}
+      <dl class="sigil-facts">
+        <div><dt>Підписант</dt><dd>{{ sig.signer or "—" }} · id {{ sig.signer_id }}</dd></div>
+        <div><dt>Алгоритм</dt><dd class="mono">{{ sig.algorithm }}</dd></div>
+        <div><dt>Key fingerprint</dt><dd class="mono sigil-fingerprint">{{ sig.fingerprint }}</dd></div>
+        <div><dt>Підписано</dt><dd class="mono">{{ sig.signed_at }}</dd></div>
+        <div><dt>Перевірено</dt><dd class="mono">{{ sig.verified_at or "—" }}</dd></div>
+        <div><dt>SHA-256 документа</dt><dd class="mono sigil-hash">{{ sig.document_sha256 }}</dd></div>
+        <div><dt>Підпис (base64)</dt><dd class="mono sigil-hash">{{ sig.signature_b64[:56] }}…</dd></div>
+      </dl>
+      <p class="api-note">
+        Статус <strong>Signed &amp; Verified</strong> означає, що RSA-PSS
+        підпис збігається з відкритим ключем підписанта та SHA-256
+        відкритого тексту. Зміна одного байта документа зробить підпис
+        недійсним.
+      </p>
+      {% if active_key %}
+        <details class="sigil-rotate">
+          <summary>Перепідписати документ</summary>
+          <form method="post" action="{{ url_for('vault.sign', doc_id=document.document_id) }}" class="sigil-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label class="field">
+              <span>Парольна фраза приватного ключа</span>
+              <input type="password" name="passphrase" minlength="{{ min_passphrase }}" required autocomplete="current-password">
+            </label>
+            <button class="btn btn--secondary btn--small" type="submit">Підписати ще раз</button>
+          </form>
+        </details>
+      {% endif %}
+    {% elif sig.status == "invalid" %}
+      <div class="signature-invalid">
+        <strong>Підпис недійсний</strong>
+        <p>Документ або підпис було модифіковано. Скачування заблоковано до повторного підписання.</p>
+      </div>
+    {% else %}
+      <p class="api-note">
+        Документ ще не підписано. Підпис створюється приватним ключем
+        автора; відкритий ключ зберігається для перевірки.
+      </p>
+      {% if active_key %}
+        <form method="post" action="{{ url_for('vault.sign', doc_id=document.document_id) }}" class="sigil-form sigil-form--inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label class="field">
+            <span>Парольна фраза приватного ключа</span>
+            <input type="password" name="passphrase" minlength="{{ min_passphrase }}" required autocomplete="current-password">
+          </label>
+          <button class="btn btn--primary" type="submit">
+            {{ icon('key') }}<span>Підписати документ</span>
+          </button>
+        </form>
+      {% else %}
+        <div class="sigil-callout">
+          <span class="icon-tile">{{ icon('key') }}</span>
+          <div>
+            <strong>Спочатку створіть ключ підпису</strong>
+            <p>Без активного RSA-PSS ключа підписати документ неможливо.</p>
+          </div>
+          <a class="btn btn--secondary btn--small" href="{{ url_for('signature.index') }}">Signature Lab</a>
+        </div>
+      {% endif %}
+    {% endif %}
+  </section>
+
   <div class="vault-grid">
     <section class="panel vault-panel">
       <div class="panel__head">
