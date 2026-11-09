@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+
+{% block body_class %}lab-page{% endblock %}
+{% block title %}SQLi-лабораторія · Secure DocVault{% endblock %}
+
+{% block content %}
+<main class="lab-shell">
+  <header class="lab-head">
+    {% include "_brand.html" %}
+    <a class="btn btn--ghost" href="{{ url_for('auth.index') }}">
+      {{ icon('arrow', 'icon--back') }}<span>Назад</span>
+    </a>
+  </header>
+
+  <section class="lab-hero">
+    <p class="eyebrow"><span class="pulse-dot"></span> Pen-test sandbox / read-only</p>
+    <h1>Перевірте, чи <span class="grad">лапка ламає запит.</span></h1>
+    <p class="lede">
+      Надішліть класичний payload. Запит виконується через Prepared Statement:
+      СУБД отримує його як літерал, а не як SQL-код. Жодних даних не змінюється,
+      сесія не створюється.
+    </p>
+  </section>
+
+  <div class="lab-grid">
+    <section class="terminal" aria-label="Результат виконання запиту">
+      <div class="terminal__bar">
+        <span></span><span></span><span></span>
+        <em>sqli_probe.py</em>
+      </div>
+      <div class="terminal__body">
+        <p class="terminal__line"><span class="prompt">$</span> payload = <span class="str">"{{ payload }}"</span></p>
+        <p class="terminal__line"><span class="prompt">&gt;</span> cursor.execute(</p>
+        <p class="terminal__line terminal__line--indent">"SELECT id, username, role FROM users WHERE username = ?",</p>
+        <p class="terminal__line terminal__line--indent">(payload,)</p>
+        <p class="terminal__line"><span class="prompt">&gt;</span> )</p>
+        {% if tested %}
+          <p class="terminal__line terminal__ok">[ OK ] rows returned: {{ 1 if result else 0 }}</p>
+          <p class="terminal__line terminal__muted">[ i ] injection blocked: {{ "true" if not result else "false" }}</p>
+          {% if result %}
+            <p class="terminal__line terminal__muted">[ i ] exact username match: {{ result["username"] }}</p>
+          {% endif %}
+        {% else %}
+          <p class="terminal__line terminal__muted">[ i ] awaiting payload...</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="lab-form panel">
+      <div class="panel__head">
+        <h2>Надіслати payload</h2>
+        <span class="badge">read-only</span>
+      </div>
+
+      <form method="post" action="{{ url_for('auth.security_lab') }}" class="auth-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="field">
+          <label for="payload">Рядок для поля username</label>
+          <textarea id="payload" name="payload" rows="3" spellcheck="false"
+                    class="mono textarea">{{ payload }}</textarea>
+        </div>
+
+        <div class="payload-presets" aria-label="Приклади payload">
+          <button type="button" class="chip" data-payload="' OR '1'='1">' OR '1'='1</button>
+          <button type="button" class="chip" data-payload="admin'--">admin'--</button>
+          <button type="button" class="chip" data-payload="' UNION SELECT 1,2,3--">' UNION SELECT 1,2,3--</button>
+        </div>
+
+        <button class="btn btn--primary btn--wide" type="submit">
+          <span>Виконати безпечний запит</span>
+          <span class="btn__arrow">{{ icon('arrow') }}</span>
+        </button>
+      </form>
+
+      <div class="lab-result {{ 'is-safe' if tested and not result else '' }}">
+        {% if tested %}
+          <strong>{{ "Ін'єкцію заблоковано" if not result else "Знайдено точний збіг" }}</strong>
+          {% if not result %}
+            <p>СУБД шукала буквальний рядок. Жодного запису не повернено, доступ не надано.</p>
+          {% else %}
+            <p>Payload збігається з наявним ім'ям користувача, але це не обхідний шлях входу.</p>
+          {% endif %}
+        {% else %}
+          <strong>Готово до перевірки</strong>
+          <p>Натисніть кнопку, щоб побачити, як параметризований запит обробляє payload.</p>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  <section class="lab-notes">
+    <article>
+      <span class="icon-tile">{{ icon('shield') }}</span>
+      <h3>Чому це працює</h3>
+      <p>СУБД компілює запит до того, як отримує значення. Тому лапка в payload залишається лапкою в рядку, а не закриває літерал.</p>
+    </article>
+    <article>
+      <span class="icon-tile">{{ icon('db') }}</span>
+      <h3>Що ми перевіряємо</h3>
+      <p>Той самий SELECT, що використовується у вході. Якщо він повертає 0 рядків — ін'єкція не спрацювала.</p>
+    </article>
+    <article>
+      <span class="icon-tile">{{ icon('lock') }}</span>
+      <h3>Що не робимо</h3>
+      <p>Не виконуємо DROP, UNION чи інші зміни. Стенд лише читає таблицю й не розкриває персональних даних.</p>
+    </article>
+  </section>
+</main>
+{% endblock %}

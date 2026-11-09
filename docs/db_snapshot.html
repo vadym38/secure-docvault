@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <title>Secure DocVault · users snapshot</title>
+  <style>
+    :root {
+      --bg: #05080b;
+      --panel: #0c141b;
+      --line: rgba(151, 193, 208, 0.18);
+      --text: #e9f3f3;
+      --muted: #8aa1a9;
+      --mint: #72f2c6;
+      --amber: #ffb86b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 34px;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 10% 0%, rgba(47, 214, 160, 0.12), transparent 28rem),
+        linear-gradient(145deg, #04070a, #070d12 55%, #04070a);
+      font-family: "Segoe UI", system-ui, sans-serif;
+      font-size: 14px;
+    }
+    h1 { margin: 0 0 4px; font-size: 28px; letter-spacing: -0.03em; }
+    h2 { margin: 26px 0 10px; font-size: 17px; }
+    p { margin: 0; color: var(--muted); }
+    code { font-family: "Cascadia Code", Consolas, monospace; }
+    .meta { display: flex; flex-wrap: wrap; gap: 10px 22px; margin: 14px 0 24px; color: var(--muted); font-size: 12px; }
+    .badge { display: inline-block; padding: 3px 8px; border: 1px solid rgba(114,242,198,.3); border-radius: 999px; color: var(--mint); font-family: "Cascadia Code", Consolas, monospace; font-size: 11px; }
+    .panel { overflow: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 9px 11px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; white-space: nowrap; }
+    th { position: sticky; top: 0; color: var(--muted); background: #0a1218; font-family: "Cascadia Code", Consolas, monospace; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+    tr:last-child td { border-bottom: 0; }
+    td code { color: var(--mint); font-size: 11px; }
+    td:nth-child(4) code, td:nth-child(5) code { color: var(--amber); }
+    .null { color: var(--muted); }
+    .empty { color: var(--muted); text-align: center; padding: 28px; }
+    ul { margin: 8px 0 0; padding-left: 20px; color: var(--muted); }
+    .note { margin-top: 20px; padding: 12px 14px; border-left: 3px solid var(--amber); border-radius: 8px; background: rgba(255,184,107,.06); color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Secure DocVault · таблиця <code>users</code></h1>
+  <p>Локальний знімок бази даних для протоколу тестування ЛР №1.</p>
+  <div class="meta">
+    <span class="badge">bcrypt cost 12</span>
+    <span>DB: <code>D:\TZIR\secure-docvault\instance\demo.db</code></span>
+    <span>Згенеровано: 2026-11-09 11:08:48 UTC</span>
+    <span>Записів: <strong>3</strong></span>
+  </div>
+
+  <h2>Схема</h2>
+  <div class="panel">
+    <table>
+      <thead>
+        <tr><th>Поле</th><th>Тип</th><th>Обов'язкове</th><th>Ключ</th><th>За замовчуванням</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>id</code></td>
+          <td><code>INTEGER</code></td>
+          <td>NULL</td>
+          <td>PK</td>
+          <td>—</td>
+        </tr>
+        
+        <tr>
+          <td><code>username</code></td>
+          <td><code>TEXT</code></td>
+          <td>NOT NULL</td>
+          <td>—</td>
+          <td>—</td>
+        </tr>
+        
+        <tr>
+          <td><code>email</code></td>
+          <td><code>TEXT</code></td>
+          <td>NOT NULL</td>
+          <td>—</td>
+          <td>—</td>
+        </tr>
+        
+        <tr>
+          <td><code>password_hash</code></td>
+          <td><code>TEXT</code></td>
+          <td>NOT NULL</td>
+          <td>—</td>
+          <td>—</td>
+        </tr>
+        
+        <tr>
+          <td><code>salt</code></td>
+          <td><code>TEXT</code></td>
+          <td>NOT NULL</td>
+          <td>—</td>
+          <td>—</td>
+        </tr>
+        
+        <tr>
+          <td><code>role</code></td>
+          <td><code>TEXT</code></td>
+          <td>NOT NULL</td>
+          <td>—</td>
+          <td>&#x27;user&#x27;</td>
+        </tr>
+        
+        <tr>
+          <td><code>created_at</code></td>
+          <td><code>TEXT</code></td>
+          <td>NOT NULL</td>
+          <td>—</td>
+          <td>strftime(&#x27;%Y-%m-%dT%H:%M:%fZ&#x27;, &#x27;now&#x27;)</td>
+        </tr>
+        
+        <tr>
+          <td><code>is_active</code></td>
+          <td><code>INTEGER</code></td>
+          <td>NOT NULL</td>
+          <td>—</td>
+          <td>1</td>
+        </tr>
+        </tbody>
+    </table>
+  </div>
+
+  <h2>Дані</h2>
+  <div class="panel">
+    <table>
+      <thead>
+        <tr><th>id</th><th>username</th><th>email</th><th>password_hash</th><th>salt</th><th>role</th><th>created_at</th><th>is_active</th></tr>
+      </thead>
+      <tbody><tr><td>1</td><td><code>admin</code></td><td><code>admin@docvault.local</code></td><td><code>$2b$12$Lki9Q60g0DkMbgGFhCFhs.uPFQbavxCpWrRmfWQXEIvAc6oXsoRKi</code></td><td><code>$2b$12$Lki9Q60g0DkMbgGFhCFhs.</code></td><td><code>admin</code></td><td><code>2026-11-09T11:08:33.657Z</code></td><td>1</td></tr><tr><td>2</td><td><code>s.koval</code></td><td><code>s.koval@docvault.local</code></td><td><code>$2b$12$Y0Unq.pqfJwP.S0vs7Z1YO0WByiOcK8AZwnGgWoqTcSlYPqosfhCG</code></td><td><code>$2b$12$Y0Unq.pqfJwP.S0vs7Z1YO</code></td><td><code>user</code></td><td><code>2026-11-09T11:08:34.094Z</code></td><td>1</td></tr><tr><td>3</td><td><code>o.kravets</code></td><td><code>o.kravets@docvault.local</code></td><td><code>$2b$12$WiLMkfGtvVUAZFyhEVwKA.k2w.QxAGCWGncQhC2aKjcjHFDuJ.yVS</code></td><td><code>$2b$12$WiLMkfGtvVUAZFyhEVwKA.</code></td><td><code>user</code></td><td><code>2026-11-09T11:08:39.149Z</code></td><td>1</td></tr></tbody>
+    </table>
+  </div>
+
+  <h2>Індекси</h2>
+  <ul><li><code>idx_users_email</code> — INDEX</li><li><code>idx_users_username</code> — INDEX</li><li><code>sqlite_autoindex_users_2</code> — UNIQUE</li><li><code>sqlite_autoindex_users_1</code> — UNIQUE</li></ul>
+
+  <p class="note">
+    Паролі не показані у відкритому вигляді: у колонках <code>password_hash</code>
+    та <code>salt</code> зберігаються результати bcrypt. Сіль унікальна для
+    кожного запису; вона також вбудована у сам bcrypt-хеш.
+  </p>
+</body>
+</html>

@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+
+{% block body_class %}app-page{% endblock %}
+{% block title %}Кабінет · Secure DocVault{% endblock %}
+
+{% block content %}
+<main class="console">
+  <aside class="console__nav">
+    {% include "_brand.html" %}
+
+    <nav class="console__menu" aria-label="Головна навігація">
+      <a class="nav-item is-active" href="{{ url_for('auth.dashboard') }}">
+        {{ icon('grid') }}<span>Огляд</span>
+      </a>
+      <a class="nav-item" href="{{ url_for('auth.security_lab') }}">
+        {{ icon('terminal') }}<span>SQLi-лабораторія</span>
+      </a>
+      <span class="nav-item is-disabled" aria-disabled="true">
+        {{ icon('db') }}<span>Документи</span><small>ЛР 5</small>
+      </span>
+      <span class="nav-item is-disabled" aria-disabled="true">
+        {{ icon('key') }}<span>Підписи</span><small>ЛР 6</small>
+      </span>
+    </nav>
+
+    <div class="console__nav-foot">
+      <div class="status-line"><span class="pulse-dot"></span> Сесія активна</div>
+      <form method="post" action="{{ url_for('auth.logout') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn--ghost btn--wide" type="submit">
+          {{ icon('logout') }}<span>Завершити сесію</span>
+        </button>
+      </form>
+      <p class="mono console__version">v0.1-auth-db</p>
+    </div>
+  </aside>
+
+  <section class="console__main">
+    <header class="console__top">
+      <div>
+        <p class="eyebrow">Особистий кабінет</p>
+        <h1>Вітаємо, {{ user.username }}.</h1>
+        <p class="console__sub">Ідентичність підтверджено. Доступ до сховища відкрито на рівні ролі <strong>{{ user.role }}</strong>.</p>
+      </div>
+      <div class="user-chip">
+        <span class="avatar">{{ user.username[0]|upper }}</span>
+        <span class="user-chip__text">
+          <strong>{{ user.username }}</strong>
+          <small>{{ user.role }} · id {{ user.id }}</small>
+        </span>
+      </div>
+    </header>
+
+    <div class="stat-grid">
+      <article class="stat-card">
+        <p class="stat-card__label">Ідентифікатор</p>
+        <p class="stat-card__value mono">#{{ '%04d'|format(user.id) }}</p>
+        <p class="stat-card__hint">Запис у таблиці <code>users</code></p>
+      </article>
+      <article class="stat-card">
+        <p class="stat-card__label">Роль</p>
+        <p class="stat-card__value">{{ user.role }}</p>
+        <p class="stat-card__hint">Принцип найменших привілеїв</p>
+      </article>
+      <article class="stat-card">
+        <p class="stat-card__label">Створено</p>
+        <p class="stat-card__value stat-card__value--small">{{ user.created_at }}</p>
+        <p class="stat-card__hint">UTC, час фіксації акаунта</p>
+      </article>
+      <article class="stat-card stat-card--accent">
+        <p class="stat-card__label">Стан</p>
+        <p class="stat-card__value">{{ "Активний" if user.is_active else "Вимкнений" }}</p>
+        <p class="stat-card__hint mono">is_active = {{ user.is_active }}</p>
+      </article>
+    </div>
+
+    <div class="panel-grid">
+      <section class="panel">
+        <div class="panel__head">
+          <h2>Профіль</h2>
+          <span class="badge">users</span>
+        </div>
+        <dl class="data-list">
+          <div><dt>username</dt><dd>{{ user.username }}</dd></div>
+          <div><dt>email</dt><dd>{{ user.email }}</dd></div>
+          <div><dt>password_hash</dt><dd class="mono hash">{{ user.password_hash[:20] }}…{{ user.password_hash[-8:] }}</dd></div>
+          <div><dt>salt</dt><dd class="mono hash">{{ user.salt[:20] }}…</dd></div>
+          <div><dt>created_at</dt><dd class="mono">{{ user.created_at }}</dd></div>
+        </dl>
+        <p class="panel__note">
+          Хеш і сіль показані частково лише в навчальному кабінеті. У виробничому
+          середовищі ці поля ніколи не віддаються клієнту.
+        </p>
+      </section>
+
+      <section class="panel">
+        <div class="panel__head">
+          <h2>Постура безпеки</h2>
+          <span class="badge badge--ok">Stage 1</span>
+        </div>
+        <ul class="check-list">
+          <li><span class="check">{{ icon('check') }}</span>Пароль збережено як bcrypt-хеш із унікальною сіллю</li>
+          <li><span class="check">{{ icon('check') }}</span>Усі SQL-запити параметризовані</li>
+          <li><span class="check">{{ icon('check') }}</span>Сесійна cookie: HttpOnly + SameSite=Lax</li>
+          <li><span class="check">{{ icon('check') }}</span>CSRF-токен на кожній формі</li>
+          <li class="is-next"><span class="check">{{ icon('arrow') }}</span>Наступний етап: JWT та захищений API</li>
+        </ul>
+        <a class="btn btn--secondary" href="{{ url_for('auth.security_lab') }}">
+          {{ icon('terminal') }}<span>Відкрити SQLi-лабораторію</span>
+        </a>
+      </section>
+    </div>
+  </section>
+</main>
+{% endblock %}

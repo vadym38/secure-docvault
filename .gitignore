@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Віртуальне середовище
+venv/
+.venv/
+
+# Секрети та локальні налаштування
+.env
+
+# Локальні бази даних
+instance/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Тимчасові файли звітів
+docs/screenshots/*.tmp
+docs/*.tmp
+
+# IDE
+.vscode/
+.idea/

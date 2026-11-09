@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+
+{% block body_class %}error-page{% endblock %}
+{% block title %}{{ code }} · Secure DocVault{% endblock %}
+
+{% block content %}
+<main class="error-shell">
+  <div class="error-card">
+    {% include "_brand.html" %}
+    <p class="error-code mono">{{ code }}</p>
+    <h1>{{ title }}</h1>
+    <p>{{ message }}</p>
+    <div class="error-actions">
+      <a class="btn btn--primary" href="{{ url_for('auth.index') }}">
+        {{ icon('arrow') }}<span>Повернутися</span>
+      </a>
+      <a class="btn btn--ghost" href="{{ url_for('auth.security_lab') }}">SQLi-лабораторія</a>
+    </div>
+  </div>
+</main>
+{% endblock %}

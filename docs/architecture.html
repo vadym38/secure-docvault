@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <title>Secure DocVault · auth flow</title>
+  <style>
+    :root {
+      --bg: #05080b;
+      --panel: #0c141b;
+      --panel-2: #101b24;
+      --line: rgba(151, 193, 208, 0.18);
+      --text: #e9f3f3;
+      --muted: #8aa1a9;
+      --mint: #72f2c6;
+      --amber: #ffb86b;
+      --blue: #7ab8ff;
+      --rose: #ff7c91;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 34px;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 12% 0%, rgba(47, 214, 160, 0.12), transparent 30rem),
+        radial-gradient(circle at 90% 100%, rgba(122, 184, 255, 0.08), transparent 30rem),
+        linear-gradient(145deg, #04070a, #070d12 55%, #04070a);
+      font-family: "Segoe UI", system-ui, sans-serif;
+    }
+    h1 { margin: 0 0 4px; font-size: 28px; letter-spacing: -0.03em; }
+    .sub { margin: 0 0 28px; color: var(--muted); font-size: 13px; }
+    .flow-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; }
+    .flow-col {
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(12, 20, 27, 0.7);
+    }
+    .flow-col h2 {
+      margin: 0 0 18px;
+      color: var(--mint);
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 13px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .node {
+      position: relative;
+      padding: 13px 15px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: linear-gradient(145deg, rgba(255,255,255,.035), rgba(255,255,255,.008));
+      font-size: 12.5px;
+      line-height: 1.45;
+    }
+    .node strong { display: block; margin-bottom: 3px; font-size: 12.5px; }
+    .node small { color: var(--muted); font-size: 11px; }
+    .node code { color: var(--amber); font-family: "Cascadia Code", Consolas, monospace; font-size: 11px; }
+    .node--client { border-left: 3px solid var(--blue); }
+    .node--server { border-left: 3px solid var(--mint); }
+    .node--db { border-left: 3px solid var(--amber); }
+    .node--ok { border-left: 3px solid var(--mint); background: rgba(114,242,198,.07); }
+    .node--deny { border-left: 3px solid var(--rose); background: rgba(255,124,145,.06); }
+    .arrow {
+      display: grid;
+      place-items: center;
+      height: 26px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+    .arrow::before { content: "↓"; }
+    .db-row {
+      margin-top: 26px;
+      padding: 18px 20px;
+      border: 1px solid rgba(255,184,107,.32);
+      border-radius: 14px;
+      background: rgba(255,184,107,.06);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .db-icon {
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      color: var(--amber);
+      background: rgba(255,184,107,.1);
+      font-size: 18px;
+    }
+    .db-row h3 { margin: 0 0 3px; font-size: 14px; }
+    .db-row p { margin: 0; color: var(--muted); font-size: 11.5px; }
+    .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 22px; color: var(--muted); font-size: 11px; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .dot--client { background: var(--blue); }
+    .dot--server { background: var(--mint); }
+    .dot--db { background: var(--amber); }
+    .note { margin-top: 22px; padding: 12px 14px; border-left: 3px solid var(--mint); border-radius: 8px; background: rgba(114,242,198,.05); color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <h1>Secure DocVault · потік автентифікації</h1>
+  <p class="sub">Етап 1 · реєстрація та вхід · bcrypt cost 12 · Prepared Statements</p>
+
+  <div class="flow-grid">
+    <section class="flow-col">
+      <h2>Реєстрація /register</h2>
+      <div class="node node--client"><strong>1. Браузер</strong>POST <code>username, email, password</code><br><small>+ CSRF-токен</small></div>
+      <div class="arrow"></div>
+      <div class="node node--server"><strong>2. Сервер</strong>Валідація username/email/пароля<br><small>8+ символів, регістр, цифра, спецсимвол</small></div>
+      <div class="arrow"></div>
+      <div class="node node--server"><strong>3. bcrypt</strong><code>gensalt(rounds=12)</code> → <code>hashpw()</code><br><small>унікальна сіль для кожного запису</small></div>
+      <div class="arrow"></div>
+      <div class="node node--db"><strong>4. SQLite</strong><code>INSERT ... VALUES (?, ?, ?, ?, ?)</code><br><small>Prepared Statement, без конкатенації</small></div>
+      <div class="arrow"></div>
+      <div class="node node--ok"><strong>5. Результат</strong>302 → <code>/login</code><br><small>flash: «Акаунт створено»</small></div>
+    </section>
+
+    <section class="flow-col">
+      <h2>Вхід /login</h2>
+      <div class="node node--client"><strong>1. Браузер</strong>POST <code>username, password</code><br><small>+ CSRF-токен</small></div>
+      <div class="arrow"></div>
+      <div class="node node--server"><strong>2. Сервер</strong>Пошук користувача<br><code>SELECT ... WHERE username = ?</code></div>
+      <div class="arrow"></div>
+      <div class="node node--db"><strong>3. SQLite</strong>0 або 1 рядок<br><small>payload залишається літералом</small></div>
+      <div class="arrow"></div>
+      <div class="node node--server"><strong>4. bcrypt.checkpw</strong>constant-time перевірка<br><small>dummy-хеш для неіснуючого user</small></div>
+      <div class="arrow"></div>
+      <div class="node node--ok"><strong>5. Успіх</strong>session cookie HttpOnly<br><small>302 → <code>/dashboard</code></small></div>
+      <div class="arrow"></div>
+      <div class="node node--deny"><strong>Альтернатива</strong>401 + «Невірне ім'я користувача або пароль.»<br><small>без розкриття причини</small></div>
+    </section>
+  </div>
+
+  <div class="db-row">
+    <div class="db-icon">▤</div>
+    <div>
+      <h3>SQLite · таблиця users</h3>
+      <p><code>id, username, email, password_hash, salt, role, created_at, is_active</code> · WAL · COLLATE NOCASE UNIQUE</p>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span><i class="dot dot--client"></i> клієнт</span>
+    <span><i class="dot dot--server"></i> серверна логіка</span>
+    <span><i class="dot dot--db"></i> база даних</span>
+  </div>
+
+  <p class="note">
+    Ключова властивість: SQL-запит компілюється з плейсхолдерами <code>?</code> до передачі
+    значень. Тому <code>' OR '1'='1</code> не може змінити синтаксис запиту — він
+    залишається рядком-значенням.
+  </p>
+</body>
+</html>

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block body_class %}auth-page{% endblock %}
+
+{% block content %}
+<main class="auth-shell">
+  <section class="brand-panel">
+    {% include "_brand.html" %}
+
+    <div class="brand-copy">
+      <p class="eyebrow"><span class="pulse-dot"></span> IAM / нульовий рівень довіри</p>
+      <h1>Сховище, яке <span class="grad">пам'ятає лише хеші.</span></h1>
+    </div>
+  </section>
+
+  <section class="form-panel">
+    <div class="form-panel__inner">
+      <nav class="mode-switch" aria-label="Режим доступу">
+        <a class="mode-switch__item {% if auth_mode == 'login' %}is-active{% endif %}"
+           href="{{ url_for('auth.login') }}"
+           {% if auth_mode == 'login' %}aria-current="page"{% endif %}>Вхід</a>
+        <a class="mode-switch__item {% if auth_mode == 'register' %}is-active{% endif %}"
+           href="{{ url_for('auth.register') }}"
+           {% if auth_mode == 'register' %}aria-current="page"{% endif %}>Реєстрація</a>
+      </nav>
+
+      {% block auth_content %}{% endblock %}
+
+      <p class="form-panel__note">
+        Навчальний стенд. Не використовуйте реальні корпоративні паролі.
+        <a href="{{ url_for('auth.security_lab') }}">SQLi-лабораторія</a>
+      </p>
+    </div>
+  </section>
+</main>
+{% endblock %}

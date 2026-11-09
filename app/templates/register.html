@@ -1,0 +1,92 @@
+{% extends "auth_base.html" %}
+{% from "_icons.html" import icon %}
+{% set auth_mode = 'register' %}
+
+{% block title %}Реєстрація · Secure DocVault{% endblock %}
+
+{% block auth_content %}
+  <header class="form-head">
+    <p class="eyebrow">Створення ідентичності</p>
+    <h2>Побудуйте свій доступ.</h2>
+    <p>Один акаунт — один унікальний хеш. Пароль не зберігається у відкритому вигляді.</p>
+  </header>
+
+  <form method="post" action="{{ url_for('auth.register') }}" class="auth-form" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="field">
+      <label for="username">Ім'я користувача</label>
+      <div class="input-wrap">
+        <span class="input-icon">{{ icon('user') }}</span>
+        <input id="username" name="username" type="text"
+               value="{{ form.username }}" autocomplete="username"
+               maxlength="32" placeholder="o.kravets" required autofocus>
+      </div>
+      <p class="field-hint">3–32 символи: латиниця, цифри, крапка, дефіс, підкреслення.</p>
+    </div>
+
+    <div class="field">
+      <label for="email">Email</label>
+      <div class="input-wrap">
+        <span class="input-icon">{{ icon('mail') }}</span>
+        <input id="email" name="email" type="email"
+               value="{{ form.email }}" autocomplete="email"
+               maxlength="254" placeholder="name@company.ua" required>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="password">Пароль</label>
+      <div class="input-wrap">
+        <span class="input-icon">{{ icon('lock') }}</span>
+        <input id="password" name="password" type="password"
+               autocomplete="new-password" placeholder="Мінімум 8 символів" required>
+        <button class="reveal" type="button" data-reveal="password" aria-label="Показати пароль">
+          <span class="reveal__show">{{ icon('eye') }}</span>
+          <span class="reveal__hide">{{ icon('eye-off') }}</span>
+        </button>
+      </div>
+
+      <div class="strength" data-strength aria-hidden="true">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <p class="strength__label">Надійність: <strong id="strength-label">—</strong></p>
+
+      <ul class="rule-list" aria-label="Вимоги до пароля">
+        <li data-rule="length"><span class="rule-dot"></span>8+ символів</li>
+        <li data-rule="upper"><span class="rule-dot"></span>велика літера</li>
+        <li data-rule="lower"><span class="rule-dot"></span>мала літера</li>
+        <li data-rule="digit"><span class="rule-dot"></span>цифра</li>
+        <li data-rule="special"><span class="rule-dot"></span>спецсимвол</li>
+      </ul>
+    </div>
+
+    <div class="field">
+      <label for="confirm_password">Повторіть пароль</label>
+      <div class="input-wrap">
+        <span class="input-icon">{{ icon('shield') }}</span>
+        <input id="confirm_password" name="confirm_password" type="password"
+               autocomplete="new-password" placeholder="Ще раз" required>
+        <button class="reveal" type="button" data-reveal="confirm_password" aria-label="Показати пароль">
+          <span class="reveal__show">{{ icon('eye') }}</span>
+          <span class="reveal__hide">{{ icon('eye-off') }}</span>
+        </button>
+      </div>
+    </div>
+
+    <button class="btn btn--primary btn--wide" type="submit">
+      <span>Створити захищений акаунт</span>
+      <span class="btn__arrow">{{ icon('arrow') }}</span>
+    </button>
+  </form>
+
+  <div class="form-meta">
+    <span class="mono">salt / user · unique</span>
+    <a href="{{ url_for('auth.security_lab') }}">Як ми блокуємо SQLi</a>
+  </div>
+
+  <p class="form-switch">
+    Уже маєте акаунт?
+    <a href="{{ url_for('auth.login') }}">Повернутися до входу</a>
+  </p>
+{% endblock %}
