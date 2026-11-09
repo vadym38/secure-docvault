@@ -40,6 +40,7 @@ class WebE2ETests(unittest.TestCase):
             {
                 "TESTING": True,
                 "SECRET_KEY": "e2e-secret-key",
+                "JWT_SECRET_KEY": "e2e-jwt-secret-key-0123456789abcdef0123456789abcdef",
                 "DATABASE": str(cls.db_path),
                 "BCRYPT_ROUNDS": 12,
                 "SESSION_COOKIE_SECURE": False,

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<title>refresh_tokens · Secure DocVault</title>
+<style>
+  :root {
+    --bg:#05080b; --panel:#0c141b; --line:rgba(151,193,208,.16);
+    --text:#e9f3f3; --soft:#c3d4d8; --muted:#8aa1a9; --mint:#72f2c6;
+    --rose:#ff7c91; --amber:#ffb86b; --blue:#7ab8ff;
+    --mono:"Cascadia Code","JetBrains Mono",Consolas,monospace;
+    --font:"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; padding:40px 46px; color:var(--text); font-family:var(--font);
+    background:
+      radial-gradient(circle at 8% 0%, rgba(47,214,160,.12), transparent 32rem),
+      radial-gradient(circle at 95% 90%, rgba(122,184,255,.08), transparent 32rem),
+      linear-gradient(145deg,#04070a,#070d12 52%,#04070a);
+  }
+  h1 { margin:0; font-size:34px; letter-spacing:-.04em; }
+  .sub { margin:8px 0 18px; color:var(--muted); font-size:13px; }
+  .meta { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px; }
+  .badge {
+    padding:5px 9px; border:1px solid var(--line); border-radius:999px;
+    color:var(--muted); font-family:var(--mono); font-size:10px;
+  }
+  .badge--ok { color:var(--mint); border-color:rgba(114,242,198,.3); }
+  .badge--warn { color:var(--amber); border-color:rgba(255,184,107,.3); }
+  .badge--bad { color:var(--rose); border-color:rgba(255,124,145,.3); }
+  table {
+    width:100%; border-collapse:collapse; overflow:hidden;
+    border:1px solid var(--line); border-radius:14px; background:var(--panel);
+  }
+  th {
+    padding:10px 11px; text-align:left; color:var(--muted);
+    font-family:var(--mono); font-size:9px; letter-spacing:.08em;
+    text-transform:uppercase; border-bottom:1px solid var(--line);
+    background:rgba(255,255,255,.02);
+  }
+  td { padding:11px; border-bottom:1px solid var(--line); color:var(--soft); font-size:11px; }
+  tr:last-child td { border-bottom:0; }
+  .mono { font-family:var(--mono); }
+  .small { font-size:10px; color:var(--muted); }
+  .pill {
+    display:inline-block; padding:3px 7px; border-radius:999px;
+    font-family:var(--mono); font-size:8.5px; letter-spacing:.05em;
+  }
+  .pill.active { color:var(--mint); background:rgba(114,242,198,.1); }
+  .pill.rotated { color:var(--blue); background:rgba(122,184,255,.1); }
+  .pill.reuse { color:var(--rose); background:rgba(255,124,145,.1); }
+  .pill.revoked { color:var(--amber); background:rgba(255,184,107,.1); }
+  .note {
+    margin-top:16px; padding:12px 14px; border:1px solid var(--line);
+    border-left:3px solid var(--mint); border-radius:10px;
+    color:var(--muted); font-size:11px; line-height:1.55;
+  }
+</style>
+</head>
+<body>
+  <h1>refresh_tokens · журнал ротації</h1>
+  <p class="sub">Кожен Refresh-токен — окремий jti. Після обміну старий запис отримує revoked_at, а повторне використання відкликає всю family_id.</p>
+  <div class="meta">
+    <span class="badge badge--ok">active: 1</span>
+    <span class="badge badge--warn">rotated: 1</span>
+    <span class="badge badge--bad">reuse detected: 1</span>
+    <span class="badge">records: 3</span>
+    <span class="badge">generated: 2026-11-09 12:11 UTC</span>
+    <span class="badge">DB: D:\TZIR\secure-docvault\instance\lab2_demo.db</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th><th>USER</th><th>JTI</th><th>FAMILY</th><th>ISSUED</th>
+        <th>EXPIRES</th><th>REVOKED</th><th>STATUS</th><th>REPLACED BY</th>
+      </tr>
+    </thead>
+    <tbody>
+      
+            <tr>
+              <td class="mono">1</td>
+              <td>o.kravets</td>
+              <td class="mono small">ozNhsdvSilrCt5uHni2MT5…</td>
+              <td class="mono small">jWskLrVvh3S0Ep-2…</td>
+              <td class="mono small">2026-11-09T12:10:57.192343Z</td>
+              <td class="mono small">2026-11-16T12:10:57.192343Z</td>
+              <td class="mono small">2026-11-09T12:11:01.389275Z</td>
+              <td><span class="pill rotated">ROTATED</span></td>
+              <td class="mono small">sggqt6TSMsw68TPyfRpblO</td>
+            </tr>
+            
+            <tr>
+              <td class="mono">2</td>
+              <td>o.kravets</td>
+              <td class="mono small">sggqt6TSMsw68TPyfRpblO…</td>
+              <td class="mono small">jWskLrVvh3S0Ep-2…</td>
+              <td class="mono small">2026-11-09T12:11:01.389073Z</td>
+              <td class="mono small">2026-11-16T12:11:01.389073Z</td>
+              <td class="mono small">2026-11-09T12:11:02.597409Z</td>
+              <td><span class="pill reuse">REUSE DETECTED</span></td>
+              <td class="mono small">—</td>
+            </tr>
+            
+            <tr>
+              <td class="mono">3</td>
+              <td>o.kravets</td>
+              <td class="mono small">G3bIBCl56L_LMOqgHGBwPD…</td>
+              <td class="mono small">mwiCqJPEa4gC0-rd…</td>
+              <td class="mono small">2026-11-09T12:11:04.212828Z</td>
+              <td class="mono small">2026-11-16T12:11:04.212828Z</td>
+              <td class="mono small">—</td>
+              <td><span class="pill active">ACTIVE</span></td>
+              <td class="mono small">—</td>
+            </tr>
+            
+    </tbody>
+  </table>
+  <p class="note">
+    <strong>Як читати:</strong> рядок <span class="mono">ROTATED</span> — токен одноразово обміняно на новий;
+    <span class="mono">REUSE DETECTED</span> — повторна спроба використати вже ротований токен;
+    <span class="mono">ACTIVE</span> — токен ще можна обміняти. Саме revoked_at/replaced_by_jti
+    реалізують blacklist та Refresh Token Rotation.
+  </p>
+</body>
+</html>

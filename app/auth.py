@@ -264,8 +264,19 @@ def security_lab():
     )
 
 
+@auth_bp.get("/api-lab")
+def api_lab():
+    """Інтерактивний стенд для демонстрації JWT REST API (ЛР №2).
+
+    Сторінка не використовує серверну сесію: усі запити до /api/v1/*
+    виконуються з браузера через fetch і показують реальні HTTP-статуси.
+    """
+
+    return render_template("api_lab.html")
+
+
 @auth_bp.get("/healthz")
 def healthz():
     """Службовий endpoint для перевірки живості застосунку."""
 
-    return jsonify(status="ok", service="secure-docvault", stage="v0.1-auth-db")
+    return jsonify(status="ok", service="secure-docvault", stage="v0.2-jwt-api")

@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+
+{% block body_class %}api-page{% endblock %}
+{% block title %}JWT API-лабораторія · Secure DocVault{% endblock %}
+
+{% block content %}
+<main class="api-shell">
+  <header class="lab-head">
+    {% include "_brand.html" %}
+    <nav class="api-head-actions" aria-label="Навігація">
+      <a class="btn btn--ghost" href="{{ url_for('auth.dashboard') }}">Кабінет</a>
+      <a class="btn btn--ghost" href="{{ url_for('auth.index') }}">
+        {{ icon('arrow', 'icon--back') }}<span>Назад</span>
+      </a>
+    </nav>
+  </header>
+
+  <section class="api-hero">
+    <p class="eyebrow"><span class="pulse-dot"></span> Stateless access / RFC 7519</p>
+    <h1>Токени замість <span class="grad">сесій.</span></h1>
+    <p class="lede">
+      REST API перевіряє підпис HS256, термін дії та тип токена на кожному запиті.
+      Access Token живе 15 хвилин, Refresh Token — 7 діб і ротується одноразово.
+      Повторне використання старого Refresh-токена відкликає всю родину токенів.
+    </p>
+  </section>
+
+  <div class="api-grid">
+    <section class="api-steps panel">
+      <div class="panel__head">
+        <h2>Протокол перевірки</h2>
+        <span class="badge">/api/v1</span>
+      </div>
+
+      <div class="api-credentials">
+        <label for="api-username">
+          <span>username</span>
+          <input id="api-username" class="mono" type="text" value="o.kravets"
+                 autocomplete="off" spellcheck="false">
+        </label>
+        <label for="api-password">
+          <span>password</span>
+          <input id="api-password" class="mono" type="password" value="Vault#2026!"
+                 autocomplete="off">
+        </label>
+      </div>
+
+      <ol class="api-step-list">
+        <li class="api-step">
+          <span class="api-step__num">01</span>
+          <div class="api-step__text">
+            <strong>Випустити пару токенів</strong>
+            <small>POST /auth/login</small>
+          </div>
+          <button id="btn-login" class="btn btn--primary btn--small" type="button">Login</button>
+        </li>
+        <li class="api-step">
+          <span class="api-step__num">02</span>
+          <div class="api-step__text">
+            <strong>Профіль із Access Token</strong>
+            <small>GET /user/profile · Bearer</small>
+          </div>
+          <button id="btn-profile" class="btn btn--secondary btn--small" type="button">Profile</button>
+        </li>
+        <li class="api-step">
+          <span class="api-step__num">03</span>
+          <div class="api-step__text">
+            <strong>Запит без токена</strong>
+            <small>GET /user/profile · без Authorization</small>
+          </div>
+          <button id="btn-no-token" class="btn btn--ghost btn--small" type="button">No token</button>
+        </li>
+        <li class="api-step">
+          <span class="api-step__num">04</span>
+          <div class="api-step__text">
+            <strong>Підмінити роль на admin</strong>
+            <small>той самий підпис, змінений Payload</small>
+          </div>
+          <button id="btn-tamper" class="btn btn--ghost btn--small" type="button">Tamper</button>
+        </li>
+        <li class="api-step">
+          <span class="api-step__num">05</span>
+          <div class="api-step__text">
+            <strong>Ротувати Refresh-токен</strong>
+            <small>POST /auth/refresh · один раз</small>
+          </div>
+          <button id="btn-refresh" class="btn btn--secondary btn--small" type="button">Refresh</button>
+        </li>
+        <li class="api-step">
+          <span class="api-step__num">06</span>
+          <div class="api-step__text">
+            <strong>Повторно використати старий Refresh</strong>
+            <small>очікується 401 + revoke родини</small>
+          </div>
+          <button id="btn-reuse" class="btn btn--ghost btn--small" type="button">Reuse</button>
+        </li>
+      </ol>
+
+      <button id="btn-clear" class="api-reset" type="button">Очистити стан стенда</button>
+      <p class="api-note">
+        Усі запити виконуються з браузера через <code>fetch</code> до реального API.
+        Пароль не зберігається: він використовується лише для обміну на токени.
+      </p>
+    </section>
+
+    <section class="api-console" aria-live="polite">
+      <div class="api-console__bar">
+        <span class="api-method" id="response-method">GET</span>
+        <code id="response-path">/api/v1/health</code>
+        <span class="status-pill" id="response-status" data-state="idle">idle</span>
+        <span class="api-time" id="response-time">—</span>
+      </div>
+
+      <div class="api-console__meta" id="request-meta">
+        <span>Готово до перевірки</span>
+        <span class="mono">Authorization: —</span>
+      </div>
+
+      <pre id="response-body" class="api-response">{
+  "service": "secure-docvault-api",
+  "stage": "v0.2-jwt-api",
+  "message": "Натисніть Login, щоб отримати пару токенів."
+}</pre>
+
+      <div class="api-token-strip">
+        <div>
+          <span>access</span>
+          <code id="access-preview">—</code>
+        </div>
+        <div>
+          <span>refresh</span>
+          <code id="refresh-preview">—</code>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="jwt-inspector" id="jwt-inspector">
+    <header class="jwt-inspector__head">
+      <div>
+        <p class="eyebrow">Decoded token</p>
+        <h2>Три частини JWT</h2>
+      </div>
+      <span class="sig-badge" id="signature-state" data-state="idle">очікує токен</span>
+    </header>
+
+    <div class="jwt-parts">
+      <article>
+        <h3><span>01</span> Header</h3>
+        <pre id="jwt-header">—</pre>
+      </article>
+      <article>
+        <h3><span>02</span> Payload</h3>
+        <pre id="jwt-payload">—</pre>
+      </article>
+      <article>
+        <h3><span>03</span> Signature</h3>
+        <pre id="jwt-signature">—</pre>
+        <p>Підпис обчислюється HMAC-SHA256 від <code>header.payload</code> і секретного ключа сервера.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="lab-notes">
+    <article>
+      <span class="icon-tile">{{ icon('shield') }}</span>
+      <h3>Підпис, а не довіра</h3>
+      <p>Payload можна прочитати, але зміна будь-якого поля робить підпис недійсним. Сервер відхиляє такий токен до виконання бізнес-логіки.</p>
+    </article>
+    <article>
+      <span class="icon-tile">{{ icon('key') }}</span>
+      <h3>Короткий Access TTL</h3>
+      <p>15 хвилин обмежують вікно атаки у разі викрадення Access-токена. Довший доступ видається лише через ротований Refresh-токен.</p>
+    </article>
+    <article>
+      <span class="icon-tile">{{ icon('alert') }}</span>
+      <h3>Reuse detection</h3>
+      <p>Кожен Refresh-токен одноразовий. Повторна спроба обміну означає компрометацію — вся родина токенів миттєво відкликається.</p>
+    </article>
+  </section>
+</main>
+
+<script src="{{ url_for('static', filename='js/api_lab.js') }}" defer></script>
+{% endblock %}

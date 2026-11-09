@@ -36,6 +36,7 @@ class DatabaseTests(unittest.TestCase):
             {
                 "TESTING": True,
                 "SECRET_KEY": "test-secret-key",
+                "JWT_SECRET_KEY": "test-jwt-secret-key-0123456789abcdef0123456789abcdef",
                 "DATABASE": str(cls.db_path),
                 "BCRYPT_ROUNDS": 4,
                 "SESSION_COOKIE_SECURE": False,

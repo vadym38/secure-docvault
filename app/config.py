@@ -1,8 +1,9 @@
-"""Конфігурація застосунку Secure DocVault (етап 1).
+"""Конфігурація застосунку Secure DocVault (етап 2).
 
 Усі секрети та шляхи читаються зі змінних оточення. Для локального запуску
 використовуйте файл .env (див. .env.example). У виробничому середовищі
-обов'язково задайте власний SECRET_KEY і увімкніть SESSION_COOKIE_SECURE.
+обов'язково задайте власні SECRET_KEY і JWT_SECRET_KEY та увімкніть
+SESSION_COOKIE_SECURE.
 """
 
 from __future__ import annotations
@@ -39,5 +40,21 @@ class Config:
 
     # Обмеження розміру запиту: форми автентифікації не потребують великих тіл.
     MAX_CONTENT_LENGTH = 1 * 1024 * 1024
+
+    # ------------------------------------------------------------------
+    # JWT / Stateless API (ЛР №2)
+    # ------------------------------------------------------------------
+
+    # Ключ підпису JWT. Мінімум 256 біт (32 байти). Порожнє значення
+    # змушує застосунок завершитися з помилкою — секрет не має fallback.
+    JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "")
+    JWT_ALGORITHM = "HS256"
+    JWT_ISSUER = "secure-docvault"
+    JWT_AUDIENCE = "secure-docvault-api"
+    JWT_ACCESS_TTL_SECONDS = int(os.environ.get("JWT_ACCESS_TTL_SECONDS", "900"))
+    JWT_REFRESH_TTL_SECONDS = int(
+        os.environ.get("JWT_REFRESH_TTL_SECONDS", str(7 * 24 * 60 * 60))
+    )
+    JWT_LEEWAY_SECONDS = int(os.environ.get("JWT_LEEWAY_SECONDS", "5"))
 
     TEMPLATES_AUTO_RELOAD = True

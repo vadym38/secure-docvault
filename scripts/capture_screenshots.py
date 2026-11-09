@@ -27,6 +27,7 @@ load_dotenv(ROOT / ".env")
 DEMO_DB = ROOT / "instance" / "demo.db"
 os.environ["DOCVAULT_DB"] = str(DEMO_DB)
 os.environ["SECRET_KEY"] = "screenshot-demo-secret-key"
+os.environ["JWT_SECRET_KEY"] = "screenshot-demo-jwt-secret-key-0123456789abcdef0123456789"
 os.environ["BCRYPT_ROUNDS"] = "12"
 os.environ["SESSION_COOKIE_SECURE"] = "0"
 

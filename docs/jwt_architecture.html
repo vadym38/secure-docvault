@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JWT access flow · Secure DocVault stage 02</title>
+<style>
+  :root {
+    --bg: #05080b;
+    --panel: #0c141b;
+    --panel-2: #101b24;
+    --line: rgba(151, 193, 208, 0.16);
+    --line-strong: rgba(151, 193, 208, 0.28);
+    --text: #e9f3f3;
+    --text-soft: #c3d4d8;
+    --muted: #8aa1a9;
+    --muted-2: #647a83;
+    --mint: #72f2c6;
+    --mint-deep: #2fd6a0;
+    --amber: #ffb86b;
+    --rose: #ff7c91;
+    --blue: #7ab8ff;
+    --mono: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+    --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    --font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 44px 54px 54px;
+    color: var(--text);
+    font-family: var(--font);
+    background:
+      radial-gradient(circle at 10% 0%, rgba(47, 214, 160, 0.12), transparent 34rem),
+      radial-gradient(circle at 95% 90%, rgba(122, 184, 255, 0.08), transparent 34rem),
+      linear-gradient(145deg, #04070a, #070d12 52%, #04070a);
+  }
+  .eyebrow {
+    margin: 0 0 10px;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  h1 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 46px;
+    line-height: 0.98;
+    letter-spacing: -0.045em;
+  }
+  h1 span {
+    color: transparent;
+    background: linear-gradient(100deg, var(--mint), #a8ffdf 45%, var(--blue));
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+  .lede {
+    max-width: 980px;
+    margin: 14px 0 30px;
+    color: var(--text-soft);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .flow {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+  .lane {
+    padding: 18px 20px;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: linear-gradient(160deg, rgba(255,255,255,0.035), rgba(255,255,255,0.006));
+  }
+  .lane__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 14px;
+  }
+  .lane__head h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-weight: 650;
+  }
+  .lane__tag {
+    padding: 4px 9px;
+    border: 1px solid rgba(114, 242, 198, 0.3);
+    border-radius: 999px;
+    color: var(--mint);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .lane__tag--rose {
+    color: var(--rose);
+    border-color: rgba(255, 124, 145, 0.3);
+  }
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .steps--five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .step {
+    position: relative;
+    min-height: 92px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(4, 8, 11, 0.45);
+  }
+  .step::after {
+    content: "→";
+    position: absolute;
+    top: 50%;
+    right: -9px;
+    z-index: 2;
+    color: var(--mint);
+    font-size: 13px;
+    transform: translateY(-50%);
+  }
+  .step:last-child::after { content: ""; }
+  .step__num {
+    display: inline-grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    margin-bottom: 7px;
+    border-radius: 6px;
+    color: var(--mint);
+    background: rgba(114, 242, 198, 0.1);
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 700;
+  }
+  .step strong {
+    display: block;
+    color: var(--text-soft);
+    font-size: 11px;
+    line-height: 1.35;
+  }
+  .step small {
+    display: block;
+    margin-top: 4px;
+    color: var(--muted-2);
+    font-family: var(--mono);
+    font-size: 9px;
+    line-height: 1.4;
+  }
+  .step--db { border-color: rgba(122, 184, 255, 0.28); }
+  .step--db .step__num { color: var(--blue); background: rgba(122, 184, 255, 0.1); }
+  .step--danger { border-color: rgba(255, 124, 145, 0.3); }
+  .step--danger .step__num { color: var(--rose); background: rgba(255, 124, 145, 0.1); }
+
+  .bottom {
+    display: grid;
+    grid-template-columns: 1.12fr 0.88fr;
+    gap: 16px;
+  }
+  .card {
+    padding: 18px 20px;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: linear-gradient(160deg, rgba(255,255,255,0.03), rgba(255,255,255,0.006));
+  }
+  .card h2 {
+    margin: 0 0 12px;
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 650;
+  }
+  .jwt-parts {
+    display: grid;
+    grid-template-columns: 0.9fr 1.5fr 0.8fr;
+    gap: 8px;
+  }
+  .jwt-part {
+    min-width: 0;
+    padding: 11px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: rgba(4, 8, 11, 0.5);
+  }
+  .jwt-part h3 {
+    margin: 0 0 6px;
+    color: var(--mint);
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .jwt-part code {
+    display: block;
+    color: var(--text-soft);
+    font-family: var(--mono);
+    font-size: 9px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+  .jwt-part p {
+    margin: 7px 0 0;
+    color: var(--muted-2);
+    font-size: 10px;
+    line-height: 1.45;
+  }
+  .controls {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .controls li {
+    display: flex;
+    gap: 9px;
+    align-items: flex-start;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    color: var(--text-soft);
+    font-size: 10.5px;
+    line-height: 1.45;
+  }
+  .controls b { color: var(--mint); font-family: var(--mono); font-size: 10px; }
+  .footer {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 16px;
+    color: var(--muted-2);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+</style>
+</head>
+<body>
+  <p class="eyebrow">Secure DocVault / stage 02 / stateless access</p>
+  <h1>JWT access <span>flow.</span></h1>
+  <p class="lede">
+    Access Token перевіряється без звернення до сесії. Refresh Token зберігається
+    в SQLite як одноразовий стан: після ротації старий jti отримує revoked_at,
+    а повторне використання відкликає всю родину токенів.
+  </p>
+
+  <div class="flow">
+    <section class="lane">
+      <div class="lane__head">
+        <h2>1. Випуск пари та доступ до захищеного ресурсу</h2>
+        <span class="lane__tag">HS256 · Bearer</span>
+      </div>
+      <div class="steps">
+        <article class="step"><span class="step__num">01</span><strong>Клієнт</strong><small>username + password</small></article>
+        <article class="step"><span class="step__num">02</span><strong>POST /auth/login</strong><small>JSON over HTTPS</small></article>
+        <article class="step"><span class="step__num">03</span><strong>bcrypt check</strong><small>constant-time verify</small></article>
+        <article class="step step--db"><span class="step__num">04</span><strong>refresh_tokens</strong><small>jti + family_id</small></article>
+        <article class="step"><span class="step__num">05</span><strong>Access + Refresh</strong><small>15 min / 7 days</small></article>
+        <article class="step"><span class="step__num">06</span><strong>GET /user/profile</strong><small>Authorization: Bearer</small></article>
+      </div>
+    </section>
+
+    <section class="lane">
+      <div class="lane__head">
+        <h2>2. Ротація Refresh Token і виявлення повторного використання</h2>
+        <span class="lane__tag">one-time rotation</span>
+      </div>
+      <div class="steps steps--five">
+        <article class="step"><span class="step__num">01</span><strong>POST /auth/refresh</strong><small>refresh_token = RT1</small></article>
+        <article class="step step--db"><span class="step__num">02</span><strong>Перевірка jti</strong><small>revoked_at IS NULL</small></article>
+        <article class="step"><span class="step__num">03</span><strong>Ротація</strong><small>RT1 → rotated</small></article>
+        <article class="step"><span class="step__num">04</span><strong>Нова пара</strong><small>RT2 у тій самій family</small></article>
+        <article class="step step--danger"><span class="step__num">05</span><strong>Повтор RT1</strong><small>401 + revoke family</small></article>
+      </div>
+    </section>
+  </div>
+
+  <div class="bottom">
+    <section class="card">
+      <h2>Структура JWT: три частини через крапку</h2>
+      <div class="jwt-parts">
+        <article class="jwt-part">
+          <h3>Header</h3>
+          <code>{"alg":"HS256","typ":"JWT"}</code>
+          <p>Алгоритм і тип. Сервер дозволяє лише HS256.</p>
+        </article>
+        <article class="jwt-part">
+          <h3>Payload</h3>
+          <code>{"sub":"1","username":"o.kravets","role":"user","type":"access","jti":"…","iat":…,"exp":…}</code>
+          <p>Клейми лише читаються; зміна робить підпис недійсним.</p>
+        </article>
+        <article class="jwt-part">
+          <h3>Signature</h3>
+          <code>HMAC-SHA256(header.payload, secret)</code>
+          <p>Секрет ≥ 256 біт зберігається лише на сервері.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Контролі нейтралізації ризиків</h2>
+      <ul class="controls">
+        <li><b>TTL</b> Access 15 хв, Refresh 7 діб; коротке вікно атаки.</li>
+        <li><b>ALG</b> Явна заборона <code>alg:none</code> та підміни алгоритму.</li>
+        <li><b>REUSE</b> Одноразовий Refresh; повтор відкликає family.</li>
+        <li><b>REVOKE</b> Blacklist Access jti до його exp.</li>
+        <li><b>DATA</b> У Payload немає паролів, хешів і зайвих PII.</li>
+      </ul>
+    </section>
+  </div>
+
+  <div class="footer">
+    <span>SECURE DOCVAULT · LAB 02 · v0.2-jwt-api</span>
+    <span>ACCESS 900s / REFRESH 604800s</span>
+  </div>
+</body>
+</html>
